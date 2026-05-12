@@ -80,62 +80,8 @@ export const dashboardApi = {
       await delay(MOCK_LATENCY_MS);
       return mockGlobalDashboard;
     }
-
-    const campaignsResponse = await campaignsApi.list({ limit: 100 });
-    const campaigns = campaignsResponse.data;
-    const dashboardPairs = await getCampaignDashboards(campaigns);
-    const dashboards = dashboardPairs.map((item) => item.dashboard);
-    const totalAttempts = sum(dashboards.map((item) => item.totalAttempts));
-    const completedAttempts = sum(dashboards.map((item) => item.completedAttempts));
-    const totalCommentTasks = sum(dashboards.map((item) => item.totalCommentTasks));
-    const completedCommentTasks = sum(
-      dashboards.map((item) => item.completedCommentTasks),
-    );
-    const totalWork = totalAttempts + totalCommentTasks;
-    const completedWork = completedAttempts + completedCommentTasks;
-    const topBuzzers = dashboards
-      .flatMap((item) => item.topBuzzers)
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 5);
-    const recentReports = dashboards
-      .flatMap((item) => item.recentReports)
-      .sort(
-        (a, b) =>
-          new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime(),
-      )
-      .slice(0, 5);
-
-    return {
-      activeCampaigns: campaigns.filter((campaign) => campaign.status === "ACTIVE").length,
-      totalViews: sum(dashboards.map((item) => item.totalViews)),
-      totalEngagement: sum(dashboards.map((item) => item.totalEngagement)),
-      completionRate:
-        totalWork > 0 ? Math.round((completedWork / totalWork) * 100) : 0,
-      overdueTasks: sum(dashboards.map((item) => item.overdueItems.length)),
-      expiredKeeps: sum(dashboards.map((item) => item.expiredAttempts)),
-      activeBuzzers: new Set(topBuzzers.map((item) => item.userId).filter(Boolean)).size,
-      engagementTrend: [],
-      topBuzzers,
-      recentActivity: recentReports.map((report) => ({
-        id: report.id,
-        type: "blast",
-        message: `${report.submittedByUser?.name ?? "Buzzer"} submitted a blast report.`,
-        timestamp: report.submittedAt,
-        actor: report.submittedByUser?.name ?? report.submittedBy,
-      })),
-      campaignPerformance: dashboardPairs.map(({ campaign, dashboard }) => {
-        const completion =
-          campaign.completionRate ?? dashboard.completionRate ?? 0;
-        return {
-          id: campaign.id,
-          name: campaign.name,
-          status: campaign.status,
-          views: dashboard.totalViews,
-          completion,
-          risk: riskFromCompletion(completion),
-        };
-      }),
-    };
+    const response = await apiClient.get<GlobalDashboardData>('/campaigns/dashboard/global');
+    return response.data;
   },
 
   async getCampaignDashboard(

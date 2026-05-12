@@ -45,11 +45,46 @@ export function AdminDashboard() {
           Array.from({ length: 5 }).map((_, i) => <MetricCardSkeleton key={i} />)
         ) : data ? (
           <>
-            <MetricCard label="Active Campaigns" value={data.activeCampaigns} delta="↑14% vs last 7 days" deltaPositive icon={<Activity size={18} />} sparklineColor="var(--cyan)" />
-            <MetricCard label="Total Views" value={data.totalViews} delta="↑22.7% vs last 7 days" deltaPositive icon={<Eye size={18} />} sparklineColor="var(--violet)" />
-            <MetricCard label="Total Engagement" value={data.totalEngagement} delta="↑18.3% vs last 7 days" deltaPositive icon={<Heart size={18} />} sparklineColor="#e040fb" />
-            <MetricCard label="Completion Rate" value={`${data.completionRate}%`} delta="↑5.6pp vs last 7 days" deltaPositive icon={<Percent size={18} />} sparklineColor="var(--cyan)" />
-            <MetricCard label="Overdue Tasks" value={data.overdueTasks} delta="↑19 vs last 7 days" deltaPositive={false} icon={<AlertTriangle size={18} />} sparklineColor="var(--status-expired)" />
+            <MetricCard
+              label="Active Campaigns"
+              value={data.activeCampaigns}
+              delta={data.activeCampaignsDelta ?? undefined}
+              deltaPositive={data.activeCampaignsDeltaPositive ?? true}
+              icon={<Activity size={18} />}
+              sparklineColor="var(--cyan)"
+            />
+            <MetricCard
+              label="Total Views"
+              value={data.totalViews}
+              delta={data.totalViewsDelta ?? undefined}
+              deltaPositive={data.totalViewsDeltaPositive ?? true}
+              icon={<Eye size={18} />}
+              sparklineColor="var(--violet)"
+            />
+            <MetricCard
+              label="Total Engagement"
+              value={data.totalEngagement}
+              delta={data.totalEngagementDelta ?? undefined}
+              deltaPositive={data.totalEngagementDeltaPositive ?? true}
+              icon={<Heart size={18} />}
+              sparklineColor="#e040fb"
+            />
+            <MetricCard
+              label="Completion Rate"
+              value={`${data.completionRate}%`}
+              delta={data.completionRateDelta ?? undefined}
+              deltaPositive={data.completionRateDeltaPositive ?? true}
+              icon={<Percent size={18} />}
+              sparklineColor="var(--cyan)"
+            />
+            <MetricCard
+              label="Overdue Tasks"
+              value={data.overdueTasks}
+              delta={data.overdueTasksDelta ?? undefined}
+              deltaPositive={data.overdueTasksDeltaPositive ?? false}
+              icon={<AlertTriangle size={18} />}
+              sparklineColor="var(--status-expired)"
+            />
           </>
         ) : null}
       </div>
