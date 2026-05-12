@@ -80,7 +80,7 @@ export default function NewCampaignPage() {
           <p className="section-subtitle">Buat campaign baru dan tetapkan platform, periode, serta anggota tim.</p>
           <div className="blast-info-banner" style={{ marginTop: '1rem', marginBottom: 0 }}>
             <Info size={18} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
-            <span>Objective, platform, dan internal notes masih UI-only untuk saat ini; backend campaign hanya menerima nama, deskripsi, periode, dan status.</span>
+            <span>Objective dan internal notes masih UI-only untuk saat ini; backend campaign menerima nama, deskripsi, platform, periode, dan status.</span>
           </div>
         </div>
       </div>

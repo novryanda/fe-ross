@@ -180,7 +180,7 @@ export default function EditCampaignPage() {
           <p className="section-subtitle">Update campaign information, period, status, and campaign members.</p>
           <div className="blast-info-banner" style={{ marginTop: '1rem', marginBottom: 0 }}>
             <Info size={18} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
-            <span>Objective, platforms, dan internal notes tetap UI-only dan tidak dikirim ke backend campaign endpoint.</span>
+            <span>Objective dan internal notes tetap UI-only dan tidak dikirim ke backend campaign endpoint.</span>
           </div>
         </div>
       </div>

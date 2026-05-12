@@ -34,6 +34,7 @@ export interface CampaignWriteDto {
   startDate: string;
   endDate?: string;
   status?: CampaignStatus;
+  platforms?: Platform[];
 }
 
 export interface CampaignUpdateDto {
@@ -42,6 +43,7 @@ export interface CampaignUpdateDto {
   startDate?: string;
   endDate?: string;
   status?: CampaignStatus;
+  platforms?: Platform[];
 }
 
 export interface AddCampaignMembersDto {
@@ -249,6 +251,7 @@ export function toCreateCampaignDto(form: CampaignWriteForm): CampaignWriteDto {
     startDate: form.startDate,
     endDate: form.endDate || undefined,
     status: form.status,
+    platforms: form.platforms,
   };
 }
 
@@ -265,6 +268,7 @@ export function toUpdateCampaignDto(
       ? { endDate: form.endDate || undefined }
       : {}),
     ...(form.status !== undefined ? { status: form.status } : {}),
+    ...(form.platforms !== undefined ? { platforms: form.platforms } : {}),
   };
 }
 

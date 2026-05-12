@@ -109,11 +109,11 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
     { label: 'Campaign name', ready: name.trim().length >= 3, emptyLabel: 'Belum diisi' },
     { label: 'Objective (UI-only)', ready: true, emptyLabel: 'Opsional' },
     { label: 'Period', ready: Boolean(startDate && endDate && !periodInvalid), emptyLabel: periodInvalid ? 'Tanggal tidak valid' : 'Belum lengkap', invalid: periodInvalid },
-    { label: 'Platforms (UI-only)', ready: true, emptyLabel: 'Opsional' },
+    { label: 'Platforms selected', ready: platforms.length > 0, emptyLabel: 'Belum dipilih' },
     { label: 'Admin members', ready: true, emptyLabel: 'Opsional' },
     { label: 'Buzzer members', ready: true, emptyLabel: 'Opsional' },
     { label: 'Status', ready: Boolean(status), emptyLabel: 'Belum dipilih' },
-  ], [endDate, name, periodInvalid, startDate, status])
+  ], [endDate, name, periodInvalid, platforms.length, startDate, status])
 
   const canCreate = checklist.every(item => item.ready)
 

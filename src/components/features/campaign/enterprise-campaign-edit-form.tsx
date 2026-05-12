@@ -112,11 +112,11 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
     { label: 'Campaign name valid', ready: name.trim().length >= 3, emptyLabel: 'Belum valid' },
     { label: 'Objective (UI-only)', ready: true, emptyLabel: 'Opsional' },
     { label: 'Period valid', ready: Boolean(startDate && endDate && !periodInvalid), emptyLabel: periodInvalid ? 'Tanggal tidak valid' : 'Belum lengkap', invalid: periodInvalid },
-    { label: 'Platforms (UI-only)', ready: true, emptyLabel: 'Opsional' },
+    { label: 'Platforms selected', ready: platforms.length > 0, emptyLabel: 'Belum dipilih' },
     { label: 'Admin members', ready: true, emptyLabel: 'Opsional' },
     { label: 'Buzzer members', ready: true, emptyLabel: 'Opsional' },
     { label: 'Status selected', ready: Boolean(status), emptyLabel: 'Belum dipilih' },
-  ], [endDate, name, periodInvalid, startDate, status])
+  ], [endDate, name, periodInvalid, platforms.length, startDate, status])
 
   const canSave = checklist.every(item => item.ready) && hasChanges
 
