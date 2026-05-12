@@ -10,12 +10,15 @@ import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { PaginationControls } from '@/components/ui/pagination-controls'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { Modal } from '@/components/ui/modal'
 import { RoleGuard } from '@/components/layout/role-guard'
+import { SocialAccountFormComponent } from '@/components/features/social-account/social-account-form'
 import { PLATFORMS, SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
 import { socialAccountsApi } from '@/lib/api/social-accounts'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { formatDate } from '@/lib/utils'
 import { useAuth } from '@/hooks/use-auth'
+import type { SocialAccountForm } from '@/lib/validations'
 import type { Platform, SocialAccountCategory, SocialAccountStatus } from '@/types'
 
 const platformIcons: Record<Platform | 'TOTAL', React.ReactNode> = {
@@ -29,6 +32,7 @@ const platformIcons: Record<Platform | 'TOTAL', React.ReactNode> = {
 export default function SocialAccountsPage() {
   const { role, isInitialized } = useAuth()
   const queryClient = useQueryClient()
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [platform, setPlatform] = useState('')
   const [status, setStatus] = useState('')
@@ -53,6 +57,16 @@ export default function SocialAccountsPage() {
         limit,
       }),
     enabled: canLoadAccounts,
+  })
+
+  const createMutation = useMutation({
+    mutationFn: (form: SocialAccountForm) => socialAccountsApi.create(form),
+    onSuccess: () => {
+      toast.success('Social account berhasil ditambahkan.')
+      queryClient.invalidateQueries({ queryKey: ['social-accounts'] })
+      setIsAddModalOpen(false)
+    },
+    onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
   })
 
   const statusMutation = useMutation({
@@ -104,9 +118,9 @@ export default function SocialAccountsPage() {
           title="Social Accounts"
           subtitle="Kelola akun sumber postingan untuk blast dan comment."
           actions={
-            <Link href="/network/social-accounts/new" className="btn-primary" style={{ textDecoration: 'none' }}>
+            <button type="button" onClick={() => setIsAddModalOpen(true)} className="btn-primary" style={{ border: 'none', cursor: 'pointer' }}>
               <Plus size={14} /> Add Account
-            </Link>
+            </button>
           }
         />
 
@@ -172,9 +186,9 @@ export default function SocialAccountsPage() {
             title="No social accounts found"
             description="Adjust filters or add a new source account."
             action={
-              <Link href="/network/social-accounts/new" className="btn-primary" style={{ textDecoration: 'none' }}>
+              <button type="button" onClick={() => setIsAddModalOpen(true)} className="btn-primary" style={{ border: 'none', cursor: 'pointer' }}>
                 <Plus size={14} /> Add Account
-              </Link>
+              </button>
             }
           />
         ) : (
@@ -258,6 +272,19 @@ export default function SocialAccountsPage() {
             />
           </div>
         )}
+
+        <Modal
+          open={isAddModalOpen}
+          onClose={() => setIsAddModalOpen(false)}
+          title="Add Social Account"
+        >
+          <SocialAccountFormComponent
+            onSubmit={async (data) => {
+              await createMutation.mutateAsync(data)
+            }}
+            loading={createMutation.isPending}
+          />
+        </Modal>
       </div>
     </RoleGuard>
   )

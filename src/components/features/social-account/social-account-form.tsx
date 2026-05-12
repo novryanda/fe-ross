@@ -5,7 +5,8 @@ import { socialAccountSchema, type SocialAccountForm } from '@/lib/validations'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { Button } from '@/components/ui/button'
-import { PLATFORMS, SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
+import { PlatformSelector } from '@/components/ui/platform-selector'
+import { SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
 import type { SocialAccount } from '@/types'
 
 interface SocialAccountFormProps {
@@ -15,14 +16,23 @@ interface SocialAccountFormProps {
 }
 
 export function SocialAccountFormComponent({ initial, onSubmit, loading }: SocialAccountFormProps) {
-  const { register, handleSubmit, formState: { errors } } = useForm<SocialAccountForm>({
+  const { register, handleSubmit, watch, setValue, formState: { errors } } = useForm<SocialAccountForm>({
     resolver: zodResolver(socialAccountSchema),
     defaultValues: initial ? { platform: initial.platform, username: initial.username, displayName: initial.displayName ?? '', profileUrl: initial.profileUrl, category: initial.category } : { platform: 'INSTAGRAM', username: '', displayName: '', profileUrl: '', category: 'MEDIA' },
   })
 
+  const currentPlatform = watch('platform')
+
   return (
     <form onSubmit={handleSubmit(onSubmit)} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-      <Select label="Platform" {...register('platform')} error={errors.platform?.message} options={PLATFORMS.map(p => ({ value: p.value, label: `${p.emoji} ${p.label}` }))} />
+      <div className="form-group">
+        <label className="form-label">Platform</label>
+        <PlatformSelector
+          value={currentPlatform}
+          onChange={(val) => setValue('platform', val, { shouldValidate: true })}
+        />
+        {errors.platform?.message && <span className="form-error">{errors.platform.message}</span>}
+      </div>
       <Input label="Username" {...register('username')} error={errors.username?.message} placeholder="e.g. mediaupdate.id" />
       <Input label="Display Name" {...register('displayName')} error={errors.displayName?.message} placeholder="e.g. Media Update ID" />
       <Input label="Profile URL" type="url" {...register('profileUrl')} error={errors.profileUrl?.message} placeholder="https://tiktok.com/@..." />
