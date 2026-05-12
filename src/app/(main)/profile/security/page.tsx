@@ -1,12 +1,15 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useRouter } from 'next/navigation'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound, Lock, Monitor, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
 import { Input } from '@/components/ui/input'
 import { profileApi } from '@/lib/api/profile'
+import { authApi } from '@/lib/api/auth'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
+import { useAuthStore } from '@/stores/auth-store'
 import { formatDateTime } from '@/lib/utils'
 
 function getPasswordStrength(password: string) {
@@ -22,6 +25,10 @@ function getPasswordStrength(password: string) {
 }
 
 export default function ProfileSecurityPage() {
+  const router = useRouter()
+  const queryClient = useQueryClient()
+  const setUser = useAuthStore((s) => s.setUser)
+
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
@@ -40,15 +47,35 @@ export default function ProfileSecurityPage() {
       profileApi.changePassword({
         currentPassword,
         newPassword,
-        confirmPassword,
         revokeOtherSessions: revokeOthers,
       }),
-    onSuccess: () => {
-      toast.success('Password berhasil diperbarui.')
+    onSuccess: async () => {
+      toast.success('Password berhasil diubah. Silakan login kembali.')
       setCurrentPassword('')
       setNewPassword('')
       setConfirmPassword('')
-      sessionsQuery.refetch()
+
+      // The backend already revoked the session and sent Set-Cookie to clear
+      // the session cookie. Now we clean up client-side state and redirect.
+      try {
+        // Call the logout endpoint as a belt-and-suspenders measure.
+        // It may fail (session already revoked) — that's fine.
+        await authApi.logout()
+      } catch {
+        // Session already invalidated by the password change endpoint.
+      } finally {
+        // ALWAYS clear client state regardless of logout outcome.
+        setUser(null)
+        queryClient.clear()
+        if (typeof window !== 'undefined') {
+          try {
+            window.sessionStorage.removeItem('mock_user')
+          } catch {
+            // sessionStorage may be blocked; ignore.
+          }
+        }
+        router.replace('/login?reason=password_changed')
+      }
     },
     onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
   })
@@ -58,6 +85,7 @@ export default function ProfileSecurityPage() {
     () => ({
       currentRequired: currentPassword.trim().length > 0,
       minLength: newPassword.length >= 8,
+      maxLength: newPassword.length <= 128,
       matches: confirmPassword.length > 0 && confirmPassword === newPassword,
       different: currentPassword.length > 0 && newPassword.length > 0 && currentPassword !== newPassword,
     }),
@@ -124,7 +152,11 @@ export default function ProfileSecurityPage() {
                 showNew,
                 setShowNew,
                 'new-password',
-                newPassword.length > 0 && newPassword.length < 8 ? 'Minimum 8 characters' : undefined,
+                newPassword.length > 0 && newPassword.length < 8
+                  ? 'Minimum 8 characters'
+                  : newPassword.length > 128
+                    ? 'Maximum 128 characters'
+                    : undefined,
               )}
               {passwordInput(
                 'Confirm New Password',
@@ -181,6 +213,7 @@ export default function ProfileSecurityPage() {
             {[
               { label: 'Current password required', ready: validation.currentRequired },
               { label: 'New password has 8+ characters', ready: validation.minLength },
+              { label: 'New password within 128 chars', ready: validation.maxLength },
               { label: 'Confirmation matches', ready: validation.matches },
               { label: 'New password differs from current', ready: validation.different },
             ].map((item) => (

@@ -12,6 +12,14 @@ import {
   type CampaignMemberRole,
 } from "./mappers/campaign.mapper";
 
+type RawMemberList =
+  | unknown[]
+  | {
+      items?: unknown[];
+      data?: unknown[];
+      meta?: PaginationMeta;
+    };
+
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -40,6 +48,26 @@ function fallbackMeta(
   };
 }
 
+function unwrapMemberList(
+  value: RawMemberList,
+  params?: ListCampaignMembersParams,
+): { rows: unknown[]; meta: PaginationMeta } {
+  if (Array.isArray(value)) {
+    return { rows: value, meta: fallbackMeta(params, value.length) };
+  }
+
+  const rows = Array.isArray(value.items)
+    ? value.items
+    : Array.isArray(value.data)
+      ? value.data
+      : [];
+
+  return {
+    rows,
+    meta: value.meta ?? fallbackMeta(params, rows.length),
+  };
+}
+
 export const campaignMembersApi = {
   async list(
     campaignId: string,
@@ -62,13 +90,14 @@ export const campaignMembersApi = {
       return { data, meta: fallbackMeta(params, data.length) };
     }
 
-    const res = await apiClient.get<unknown[]>(
+    const res = await apiClient.get<RawMemberList>(
       `/campaigns/${campaignId}/members`,
       { ...params },
     );
+    const list = unwrapMemberList(res.data, params);
     return {
-      data: res.data.map(toCampaignMember),
-      meta: res.meta ?? fallbackMeta(params, res.data.length),
+      data: list.rows.map(toCampaignMember),
+      meta: res.meta ?? list.meta,
     };
   },
 
@@ -99,13 +128,14 @@ export const campaignMembersApi = {
       return this.list(campaignId);
     }
 
-    const res = await apiClient.post<unknown[]>(
+    const res = await apiClient.post<RawMemberList>(
       `/campaigns/${campaignId}/members`,
       dto,
     );
+    const list = unwrapMemberList(res.data);
     return {
-      data: res.data.map(toCampaignMember),
-      meta: res.meta ?? fallbackMeta(undefined, res.data.length),
+      data: list.rows.map(toCampaignMember),
+      meta: res.meta ?? list.meta,
     };
   },
 

@@ -18,35 +18,45 @@ const LINE_COLORS: Record<string, string> = {
 }
 
 export function EngagementTrend({ data, lines = ['engagement'], height = 280 }: EngagementTrendProps) {
+  const hasData = data.some(point =>
+    lines.some(line => typeof point[line] === 'number' && Number(point[line]) > 0),
+  )
+
   return (
     <div className="card" style={{ padding: '1.25rem' }}>
       <h3 style={{ fontSize: '0.875rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '1rem' }}>
-        📈 Engagement Trend
+        Engagement Trend
       </h3>
-      <ResponsiveContainer width="100%" height={height}>
-        <AreaChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
-          <defs>
+      {!hasData ? (
+        <div style={{ height, display: 'grid', placeItems: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 8, color: 'var(--text-muted)', textAlign: 'center', padding: '1rem' }}>
+          Belum ada data engagement. Submit Blast Report untuk membentuk grafik.
+        </div>
+      ) : (
+        <ResponsiveContainer width="100%" height={height}>
+          <AreaChart data={data} margin={{ top: 5, right: 5, left: -10, bottom: 5 }}>
+            <defs>
+              {lines.map(l => (
+                <linearGradient key={l} id={`grad-${l}`} x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor={LINE_COLORS[l]} stopOpacity={0.3} />
+                  <stop offset="95%" stopColor={LINE_COLORS[l]} stopOpacity={0} />
+                </linearGradient>
+              ))}
+            </defs>
+            <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
+            <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => String(v).slice(5)} />
+            <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => formatNumber(Number(v))} />
+            <Tooltip
+              contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, fontSize: '0.8125rem' }}
+              labelStyle={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}
+              formatter={(value) => formatNumber(Number(value ?? 0))}
+            />
+            {lines.length > 1 && <Legend wrapperStyle={{ fontSize: '0.75rem', color: 'var(--text-muted)' }} />}
             {lines.map(l => (
-              <linearGradient key={l} id={`grad-${l}`} x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor={LINE_COLORS[l]} stopOpacity={0.3} />
-                <stop offset="95%" stopColor={LINE_COLORS[l]} stopOpacity={0} />
-              </linearGradient>
+              <Area key={l} type="monotone" dataKey={l} stroke={LINE_COLORS[l]} fill={`url(#grad-${l})`} strokeWidth={2} name={l.charAt(0).toUpperCase() + l.slice(1)} />
             ))}
-          </defs>
-          <CartesianGrid strokeDasharray="3 3" stroke="var(--border-subtle)" />
-          <XAxis dataKey="date" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => v.slice(5)} />
-          <YAxis tick={{ fill: 'var(--text-muted)', fontSize: 11 }} tickFormatter={v => formatNumber(Number(v))} />
-          <Tooltip
-            contentStyle={{ background: 'var(--bg-elevated)', border: '1px solid var(--border-default)', borderRadius: 10, fontSize: '0.8125rem' }}
-            labelStyle={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}
-            formatter={(value) => formatNumber(Number(value ?? 0))}
-          />
-          {lines.length > 1 && <Legend wrapperStyle={{ fontSize: '0.75rem', color: 'var(--text-muted)' }} />}
-          {lines.map(l => (
-            <Area key={l} type="monotone" dataKey={l} stroke={LINE_COLORS[l]} fill={`url(#grad-${l})`} strokeWidth={2} name={l.charAt(0).toUpperCase() + l.slice(1)} />
-          ))}
-        </AreaChart>
-      </ResponsiveContainer>
+          </AreaChart>
+        </ResponsiveContainer>
+      )}
     </div>
   )
 }

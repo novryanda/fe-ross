@@ -23,6 +23,10 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
+function asNullableNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 function asOptionalString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
@@ -141,7 +145,12 @@ export function toBlastReport(value: unknown): BlastReport {
 
 export function toBlastAttempt(value: unknown): BlastAttempt {
   const raw = asRecord(value);
-  const keptByUser = asUser(raw.keptBy) ?? asUser(raw.keptByUser);
+  const keptByUser =
+    asUser(raw.keptBy) ??
+    asUser(raw.keptByUser) ??
+    asUser(raw.claimedBy) ??
+    asUser(raw.claimedByUser) ??
+    asUser(raw.user);
   const report = raw.report ? toBlastReport(raw.report) : undefined;
 
   return {
@@ -195,11 +204,14 @@ export function toBlastTarget(value: unknown): BlastTarget {
   const attempts = Array.isArray(raw.attempts) ? raw.attempts.map(toBlastAttempt) : undefined;
   const latestAttempt = raw.latestAttempt
     ? toBlastAttempt(raw.latestAttempt)
-    : attempts?.[0];
+    : raw.currentAttempt
+      ? toBlastAttempt(raw.currentAttempt)
+      : Array.isArray(raw.attempts) && attempts?.length
+        ? [...attempts].sort((a, b) => b.attemptNo - a.attemptNo)[0]
+        : undefined;
   const count = asRecord(raw._count);
-  const totalAttempts = asNumber(raw.totalAttempts ?? count.attempts, attempts?.length ?? 0);
   const completedAttempts = asNumber(
-    raw.completedAttempts,
+    raw.completedAttempts ?? raw.completedAttemptCount,
     attempts?.filter((attempt) => attempt.status === "COMPLETED").length ?? 0,
   );
 
@@ -220,7 +232,7 @@ export function toBlastTarget(value: unknown): BlastTarget {
     updatedAt: asString(raw.updatedAt),
     attempts,
     latestAttempt,
-    totalAttempts,
-    completedAttempts,
+    totalAttempts: asNullableNumber(raw.totalAttempts ?? raw.attemptCount ?? count.attempts) ?? attempts?.length,
+    completedAttempts: asNullableNumber(raw.completedAttempts ?? raw.completedAttemptCount) ?? (attempts ? completedAttempts : undefined),
   };
 }

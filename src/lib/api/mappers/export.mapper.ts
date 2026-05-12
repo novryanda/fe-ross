@@ -8,9 +8,9 @@
  *     campaign: { id, name, status, startDate, endDate },
  *     format: "PDF"|"EXCEL",
  *     status: "PENDING"|"PROCESSING"|"COMPLETED"|"FAILED",
- *     downloadUrl, fileUrl,
+ *     fileName, fileUrl, fileSize, mimeType,
  *     requestedBy: { id, name, email, role },
- *     generatedAt, createdAt
+ *     dateFrom, dateTo, startedAt, completedAt, failedAt, createdAt
  *   }
  *
  * Mock / UI shape keeps a flatter `ExportRecord` with `completedAt` instead of
@@ -98,23 +98,27 @@ export function toExportRecord(value: unknown): ExportRecord {
     format: asFormat(raw.format),
     scope: asScope(raw.scope),
     status: asStatus(raw.status),
+    dateFrom: asOptionalString(raw.dateFrom),
+    dateTo: asOptionalString(raw.dateTo),
+    fileName: asOptionalString(raw.fileName),
+    fileUrl: asOptionalString(raw.fileUrl),
     downloadUrl:
       asOptionalString(raw.downloadUrl) ?? asOptionalString(raw.fileUrl),
     requestedBy: requestedById,
     requestedByName,
+    mimeType: asOptionalString(raw.mimeType),
+    errorMessage: asOptionalString(raw.errorMessage),
+    retriedFromId: asOptionalString(raw.retriedFromId),
+    requestedAt: asOptionalString(raw.requestedAt) ?? asOptionalString(raw.createdAt),
+    startedAt: asOptionalString(raw.startedAt),
     createdAt: asString(raw.createdAt),
     completedAt:
       asOptionalString(raw.completedAt) ?? asOptionalString(raw.generatedAt),
+    failedAt: asOptionalString(raw.failedAt),
     fileSize: asNumber(raw.fileSize),
   };
 }
 
-/**
- * Backend `CreateExportDto` only accepts `{ format }` today (contract v1.3).
- * We still accept `scope` from the form so adapters can round-trip the value
- * back into the UI after a mock create; real mode ignores it until backend
- * support lands.
- */
 export interface CreateExportForm {
   format: ExportFormat;
   scope?: ExportScope;
@@ -124,6 +128,14 @@ export interface CreateExportForm {
 
 export function toCreateExportDto(form: CreateExportForm): {
   format: ExportFormat;
+  scope?: ExportScope;
+  dateFrom?: string;
+  dateTo?: string;
 } {
-  return { format: form.format };
+  return {
+    format: form.format,
+    scope: form.scope,
+    dateFrom: form.dateFrom || undefined,
+    dateTo: form.dateTo || undefined,
+  };
 }

@@ -61,6 +61,8 @@ export function BlastFilterToolbar({
           <option value="KEPT">Kept / Claimed</option>
           <option value="COMPLETED">Completed</option>
           <option value="EXPIRED">Expired</option>
+          <option value="RELEASED">Released</option>
+          <option value="CANCELLED">Cancelled</option>
         </select>
       </div>
       <div className="blast-filter-control has-icon">

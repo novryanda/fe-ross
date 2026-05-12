@@ -1,5 +1,5 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Edit2, Eye, Plus, Shield, UserCheck, UserMinus, Users } from 'lucide-react'
@@ -8,6 +8,7 @@ import { PageHeader } from '@/components/ui/page-header'
 import { DataFilters } from '@/components/ui/data-filters'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { RoleBadge } from '@/components/layout/role-badge'
 import { StatusBadge } from '@/components/ui/badges'
@@ -23,31 +24,40 @@ export default function NetworkMembersPage() {
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const canLoadMembers = isInitialized && role === 'ADMIN'
 
+  useEffect(() => {
+    setPage(1)
+  }, [search, roleFilter, statusFilter])
+
   const membersQuery = useQuery({
-    queryKey: ['users', { search, roleFilter, statusFilter }],
+    queryKey: ['users', { search, roleFilter, statusFilter, page, limit }],
     queryFn: () =>
       usersApi.list({
         search: search || undefined,
         role: (roleFilter || undefined) as UserRole | undefined,
         status: (statusFilter || undefined) as UserStatus | undefined,
-        limit: 100,
+        page,
+        limit,
       }),
     enabled: canLoadMembers,
   })
 
-  const deactivateMutation = useMutation({
-    mutationFn: (userId: string) => usersApi.updateStatus(userId, { status: 'INACTIVE' }),
-    onSuccess: () => {
-      toast.success('Member di-nonaktifkan.')
+  const statusMutation = useMutation({
+    mutationFn: ({ userId, status }: { userId: string; status: UserStatus }) =>
+      usersApi.updateStatus(userId, { status }),
+    onSuccess: (_user, variables) => {
+      toast.success(variables.status === 'ACTIVE' ? 'Member diaktifkan.' : 'Member di-nonaktifkan.')
       queryClient.invalidateQueries({ queryKey: ['users'] })
     },
     onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
   })
 
   const users = membersQuery.data?.items ?? []
-  const total = membersQuery.data?.meta?.total ?? users.length
+  const meta = membersQuery.data?.meta
+  const total = meta?.total ?? users.length
 
   const kpis = [
     { label: 'Total Members', value: total, accent: 'var(--cyan)', icon: <Users size={20} /> },
@@ -157,10 +167,8 @@ export default function NetworkMembersPage() {
               <tbody>
                 {users.map((user) => {
                   const isSelf = currentUser?.id === user.id
-                  const deactivateDisabled =
-                    user.status === 'INACTIVE' ||
-                    isSelf ||
-                    (deactivateMutation.isPending && deactivateMutation.variables === user.id)
+                  const isStatusLoading = statusMutation.isPending && statusMutation.variables?.userId === user.id
+                  const statusDisabled = isSelf || isStatusLoading
                   return (
                     <tr key={user.id}>
                       <td>
@@ -186,15 +194,27 @@ export default function NetworkMembersPage() {
                           <Link href={`/network/members/${user.id}`} className="icon-action" style={{ textDecoration: 'none' }}>
                             <Edit2 size={13} /> Edit
                           </Link>
-                          <button
-                            type="button"
-                            className="icon-action danger"
-                            disabled={deactivateDisabled}
-                            title={isSelf ? 'Admin tidak dapat menonaktifkan dirinya sendiri.' : undefined}
-                            onClick={() => deactivateMutation.mutate(user.id)}
-                          >
-                            <UserMinus size={13} /> Deactivate
-                          </button>
+                          {user.status === 'INACTIVE' ? (
+                            <button
+                              type="button"
+                              className="icon-action"
+                              disabled={statusDisabled}
+                              title={isSelf ? 'Admin tidak dapat mengubah status dirinya sendiri.' : undefined}
+                              onClick={() => statusMutation.mutate({ userId: user.id, status: 'ACTIVE' })}
+                            >
+                              {isStatusLoading ? <span className="spinner" /> : <UserCheck size={13} />} Activate
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              className="icon-action danger"
+                              disabled={statusDisabled}
+                              title={isSelf ? 'Admin tidak dapat menonaktifkan dirinya sendiri.' : undefined}
+                              onClick={() => statusMutation.mutate({ userId: user.id, status: 'INACTIVE' })}
+                            >
+                              {isStatusLoading ? <span className="spinner" /> : <UserMinus size={13} />} Deactivate
+                            </button>
+                          )}
                         </div>
                       </td>
                     </tr>
@@ -206,6 +226,16 @@ export default function NetworkMembersPage() {
               <span>Showing {users.length} of {total} members</span>
               <span>Users are system login accounts. Social Accounts are separate posting sources.</span>
             </div>
+            <PaginationControls
+              meta={meta}
+              pageSize={limit}
+              itemLabel="members"
+              onPageChange={setPage}
+              onPageSizeChange={(nextLimit) => {
+                setLimit(nextLimit)
+                setPage(1)
+              }}
+            />
           </div>
         )}
       </div>

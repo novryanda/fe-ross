@@ -8,14 +8,15 @@ import type { CampaignStatus, Platform } from '@/types'
 import {
   CampaignSummaryCard,
   CompletionChecklistCard,
-  MemberColumn,
+  MemberGroup,
   MOCK_MEMBERS,
   PLATFORM_OPTIONS,
   SectionHeader,
-  UserChip,
   type ChecklistItem,
   type MockMember,
 } from '@/components/features/campaign/enterprise-campaign-form'
+import { AddCampaignMemberModal } from './add-campaign-member-modal'
+import { Plus } from 'lucide-react'
 
 export interface EnterpriseCampaignEditPayload {
   name: string
@@ -83,6 +84,7 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
   const [buzzerIds, setBuzzerIds] = useState<string[]>(initial.members.buzzerIds)
   const [viewerIds, setViewerIds] = useState<string[]>(initial.members.viewerIds)
   const [notes, setNotes] = useState(initial.internalNotes ?? '')
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
 
   const admins = availableMembers.filter(user => user.role === 'ADMIN')
   const buzzers = availableMembers.filter(user => user.role === 'BUZZER')
@@ -128,6 +130,12 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
       return
     }
     setter(current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  }
+
+  const handleConfirmMembers = (users: MockMember[]) => {
+    setAdminIds(users.filter(u => u.role === 'ADMIN').map(u => u.id))
+    setBuzzerIds(users.filter(u => u.role === 'BUZZER').map(u => u.id))
+    setViewerIds(users.filter(u => u.role === 'VIEWER').map(u => u.id))
   }
 
   const summaryText = (value: string) => value.trim() || 'Belum diisi'
@@ -250,18 +258,46 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
           </section>
 
           <section className="campaign-create-section">
-            <SectionHeader number={5} title="Campaign Members" icon={<Users size={15} />} />
+            <SectionHeader 
+              number={5} 
+              title="Campaign Members" 
+              icon={<Users size={15} />} 
+              action={
+                <Button type="button" variant="secondary" size="sm" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={14} />}>
+                  Add Member
+                </Button>
+              }
+            />
             <p className="section-helper-text">Assignment ini berlaku di level Campaign. Blast Link tetap tidak memiliki manual assignment.</p>
             {membersLoading && <p className="muted-meta">Memuat user aktif...</p>}
-            <div className="member-grid">
-              <MemberColumn title="Admin" required users={admins} selectedIds={adminIds} onToggle={id => toggleId(id, adminIds, setAdminIds, true)} />
-              <MemberColumn title="Buzzers" required users={buzzers} selectedIds={buzzerIds} onToggle={id => toggleId(id, buzzerIds, setBuzzerIds)} />
-              <MemberColumn title="Viewers" users={viewers} selectedIds={viewerIds} onToggle={id => toggleId(id, viewerIds, setViewerIds)} />
-            </div>
-            <div className="selected-chip-row">
-              {[...selectedAdmins, ...selectedBuzzers, ...selectedViewers].map(user => <UserChip key={user.id} user={user} />)}
-              {!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length && <span className="muted-meta">Belum ada member dipilih.</span>}
-            </div>
+            
+            {(!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length) ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 12, background: 'var(--bg-surface)' }}>
+                <Users size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem', opacity: 0.5 }} />
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Belum ada member dipilih. Klik Add Member untuk menambahkan user.</p>
+                <Button type="button" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={16} />}>Add Member</Button>
+              </div>
+            ) : (
+              <div className="member-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                <MemberGroup 
+                  title="ADMIN" 
+                  users={selectedAdmins} 
+                  required 
+                  onRemove={(id) => setAdminIds(prev => prev.filter(x => x !== id))} 
+                />
+                <MemberGroup 
+                  title="BUZZERS" 
+                  users={selectedBuzzers} 
+                  required={status === 'ACTIVE'} 
+                  onRemove={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))} 
+                />
+                <MemberGroup 
+                  title="VIEWERS" 
+                  users={selectedViewers} 
+                  onRemove={(id) => setViewerIds(prev => prev.filter(x => x !== id))} 
+                />
+              </div>
+            )}
           </section>
 
           <section className="campaign-create-section">
@@ -313,6 +349,14 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
           </div>
         </div>
       </aside>
+
+      <AddCampaignMemberModal
+        open={isMemberModalOpen}
+        onOpenChange={setIsMemberModalOpen}
+        availableMembers={availableMembers}
+        selectedUserIds={[...adminIds, ...buzzerIds, ...viewerIds]}
+        onConfirm={handleConfirmMembers}
+      />
     </div>
   )
 }

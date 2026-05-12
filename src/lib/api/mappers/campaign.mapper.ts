@@ -54,7 +54,9 @@ export interface AddCampaignMembersDto {
 type RawRecord = Record<string, unknown>;
 
 function asRecord(value: unknown): RawRecord {
-  return typeof value === "object" && value !== null ? (value as RawRecord) : {};
+  return typeof value === "object" && value !== null
+    ? (value as RawRecord)
+    : {};
 }
 
 function asString(value: unknown, fallback = ""): string {
@@ -69,7 +71,16 @@ function asNumber(value: unknown, fallback = 0): number {
   return typeof value === "number" && Number.isFinite(value) ? value : fallback;
 }
 
-function asStatus(value: unknown, fallback: CampaignStatus = "DRAFT"): CampaignStatus {
+function asNullableNumber(value: unknown): number | undefined {
+  return typeof value === "number" && Number.isFinite(value)
+    ? value
+    : undefined;
+}
+
+function asStatus(
+  value: unknown,
+  fallback: CampaignStatus = "DRAFT",
+): CampaignStatus {
   return value === "ACTIVE" ||
     value === "COMPLETED" ||
     value === "ARCHIVED" ||
@@ -109,7 +120,9 @@ function asUser(raw: unknown): User | undefined {
     name: name || "Unknown User",
     email,
     role:
-      value.role === "ADMIN" || value.role === "BUZZER" || value.role === "VIEWER"
+      value.role === "ADMIN" ||
+      value.role === "BUZZER" ||
+      value.role === "VIEWER"
         ? value.role
         : "VIEWER",
     status: value.status === "INACTIVE" ? "INACTIVE" : "ACTIVE",
@@ -123,6 +136,72 @@ function asUser(raw: unknown): User | undefined {
 function countFrom(raw: RawRecord, key: string): number {
   const count = asRecord(raw._count);
   return asNumber(count[key], 0);
+}
+
+function optionalCountFrom(raw: RawRecord, key: string): number | undefined {
+  const count = asRecord(raw._count);
+  return asNullableNumber(count[key]);
+}
+
+function uniquePlatforms(platforms: Platform[]): Platform[] {
+  return [...new Set(platforms)];
+}
+
+function platformsFromCampaign(value: RawRecord): Platform[] {
+  const direct = asPlatformArray(value.platforms);
+  const single = asPlatform(value.platform);
+  const targetPlatforms = asPlatformArray(value.targetPlatforms);
+  const blastTargets = Array.isArray(value.blastTargets)
+    ? value.blastTargets.flatMap((item) => {
+        const target = asRecord(item);
+        const platform = asPlatform(target.platform);
+        return platform ? [platform] : [];
+      })
+    : [];
+
+  return uniquePlatforms([
+    ...direct,
+    ...(single ? [single] : []),
+    ...targetPlatforms,
+    ...blastTargets,
+  ]);
+}
+
+function completionFromCampaign(value: RawRecord): number | undefined {
+  const direct =
+    asNullableNumber(value.completionRate) ??
+    asNullableNumber(value.completionPercentage) ??
+    asNullableNumber(value.progress);
+
+  if (direct !== undefined) return direct;
+
+  const completedAttempts =
+    asNullableNumber(value.completedAttempts) ??
+    asNullableNumber(value.completedAttemptCount);
+  const totalAttempts =
+    asNullableNumber(value.totalAttempts) ??
+    asNullableNumber(value.attemptCount);
+
+  if (completedAttempts !== undefined && totalAttempts && totalAttempts > 0) {
+    return Math.round((completedAttempts / totalAttempts) * 100);
+  }
+
+  const blastTargets = Array.isArray(value.blastTargets)
+    ? value.blastTargets
+    : [];
+  const attempts = blastTargets.flatMap((item) => {
+    const target = asRecord(item);
+    return Array.isArray(target.attempts) ? target.attempts.map(asRecord) : [];
+  });
+
+  if (attempts.length > 0) {
+    const completed = attempts.filter(
+      (attempt) => attempt.status === "COMPLETED",
+    ).length;
+    return Math.round((completed / attempts.length) * 100);
+  }
+
+  return undefined;
 }
 
 export function toCampaign(raw: unknown): Campaign {
@@ -141,18 +220,21 @@ export function toCampaign(raw: unknown): Campaign {
     status: asStatus(value.status),
     startDate: asString(value.startDate),
     endDate: asOptionalString(value.endDate),
-    platforms: asPlatformArray(value.platforms),
+    // TODO API: campaign list should expose platform summary directly instead of deriving from blastTargets.
+    platforms: platformsFromCampaign(value),
     ownerId: createdById,
     owner: createdBy,
     createdAt: asString(value.createdAt, new Date(0).toISOString()),
     updatedAt: asString(value.updatedAt, new Date(0).toISOString()),
-    memberCount: asNumber(value.memberCount, countFrom(value, "members")),
-    blastTargetCount: asNumber(
-      value.blastTargetCount,
-      countFrom(value, "blastTargets"),
-    ),
+    memberCount:
+      asNullableNumber(value.memberCount) ??
+      optionalCountFrom(value, "members"),
+    blastTargetCount:
+      asNullableNumber(value.blastTargetCount) ??
+      optionalCountFrom(value, "blastTargets"),
     completedAttemptCount: asNumber(value.completedAttemptCount, 0),
-    completionRate: asNumber(value.completionRate, 0),
+    // TODO API: campaign list should expose completionRate directly for cheap pagination.
+    completionRate: completionFromCampaign(value),
     commentCommandCount: asNumber(
       value.commentCommandCount,
       countFrom(value, "commentCommands"),
@@ -179,7 +261,9 @@ export function toUpdateCampaignDto(
       ? { description: form.description?.trim() || undefined }
       : {}),
     ...(form.startDate !== undefined ? { startDate: form.startDate } : {}),
-    ...(form.endDate !== undefined ? { endDate: form.endDate || undefined } : {}),
+    ...(form.endDate !== undefined
+      ? { endDate: form.endDate || undefined }
+      : {}),
     ...(form.status !== undefined ? { status: form.status } : {}),
   };
 }
@@ -218,7 +302,9 @@ export function toAddMembersDto(
   ];
 
   return {
-    members: [...new Map(members.map((member) => [member.userId, member])).values()],
+    members: [
+      ...new Map(members.map((member) => [member.userId, member])).values(),
+    ],
   };
 }
 
@@ -242,6 +328,55 @@ function toRecentReport(raw: unknown): BlastReport {
   };
 }
 
+function toTrendPoint(raw: unknown) {
+  const value = asRecord(raw);
+  const views = asNumber(value.views);
+  const likes = asNumber(value.likes);
+  const comments = asNumber(value.comments);
+  const shares = asNumber(value.shares);
+  const reposts = asNumber(value.reposts);
+
+  return {
+    date: asString(value.date, asString(value.submittedAt).slice(0, 10)),
+    views,
+    likes,
+    comments,
+    shares,
+    reposts,
+    engagement: asNumber(value.engagement, likes + comments + shares + reposts),
+  };
+}
+
+function trendFromReports(
+  reports: unknown[],
+): ReturnType<typeof toTrendPoint>[] {
+  const byDate = new Map<string, ReturnType<typeof toTrendPoint>>();
+
+  for (const report of reports) {
+    const point = toTrendPoint(report);
+    if (!point.date) continue;
+    const current = byDate.get(point.date) ?? {
+      date: point.date,
+      views: 0,
+      likes: 0,
+      comments: 0,
+      shares: 0,
+      reposts: 0,
+      engagement: 0,
+    };
+
+    current.views = (current.views ?? 0) + (point.views ?? 0);
+    current.likes = (current.likes ?? 0) + (point.likes ?? 0);
+    current.comments = (current.comments ?? 0) + (point.comments ?? 0);
+    current.shares = (current.shares ?? 0) + (point.shares ?? 0);
+    current.reposts = (current.reposts ?? 0) + (point.reposts ?? 0);
+    current.engagement = (current.engagement ?? 0) + (point.engagement ?? 0);
+    byDate.set(point.date, current);
+  }
+
+  return [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export function toCampaignDashboard(raw: unknown): CampaignDashboardData {
   const value = asRecord(raw);
   const summary = asRecord(value.summary);
@@ -254,6 +389,18 @@ export function toCampaignDashboard(raw: unknown): CampaignDashboardData {
     (sum, item) => sum + asNumber(asRecord(item).views),
     0,
   );
+  const rawRecentReports = Array.isArray(value.recentReports)
+    ? value.recentReports
+    : [];
+  const rawTrend = Array.isArray(value.engagementTrend)
+    ? value.engagementTrend
+    : Array.isArray(value.trends)
+      ? value.trends
+      : Array.isArray(value.dailyMetrics)
+        ? value.dailyMetrics
+        : Array.isArray(value.series)
+          ? value.series
+          : [];
 
   return {
     totalViews: asNumber(summary.totalViews),
@@ -276,7 +423,9 @@ export function toCampaignDashboard(raw: unknown): CampaignDashboardData {
       summary.totalCommentTasks,
       asNumber(comment.totalCommentTasks),
     ),
-    engagementTrend: [],
+    engagementTrend: rawTrend.length
+      ? rawTrend.map(toTrendPoint)
+      : trendFromReports(rawRecentReports),
     platformBreakdown: rawBreakdown.flatMap((item) => {
       const row = asRecord(item);
       const platform = asPlatform(row.platform);
@@ -311,10 +460,7 @@ export function toCampaignDashboard(raw: unknown): CampaignDashboardData {
         };
       },
     ),
-    recentReports: (Array.isArray(value.recentReports)
-      ? value.recentReports
-      : []
-    ).map(toRecentReport),
+    recentReports: rawRecentReports.map(toRecentReport),
     overdueItems: [],
   };
 }

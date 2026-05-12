@@ -1,7 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMutation, useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ArrowLeft, Info } from 'lucide-react'
 import { EnterpriseCampaignForm, type EnterpriseCampaignPayload, type MockMember } from '@/components/features/campaign/enterprise-campaign-form'
 import { campaignsApi } from '@/lib/api/campaigns'
@@ -21,6 +21,7 @@ function toSelectableMembers(users: Awaited<ReturnType<typeof usersApi.list>> | 
 
 export default function NewCampaignPage() {
   const router = useRouter()
+  const queryClient = useQueryClient()
   const usersQuery = useQuery({
     queryKey: ['campaign-form-users'],
     queryFn: () => usersApi.list({ limit: 100, status: 'ACTIVE' }),
@@ -35,6 +36,11 @@ export default function NewCampaignPage() {
         try {
           await campaignMembersApi.add(campaign.id, data.members)
         } catch (error) {
+          console.error('Campaign member add failed after campaign create', {
+            campaignId: campaign.id,
+            members: data.members,
+            error,
+          })
           return { campaign, memberError: error }
         }
       }
@@ -43,10 +49,13 @@ export default function NewCampaignPage() {
     },
     onSuccess: ({ campaign, memberError }) => {
       if (memberError) {
-        toast.warning(`Campaign dibuat, tetapi member gagal ditambahkan: ${mapApiErrorToToastMessage(memberError)}`)
+        toast.warning('Campaign berhasil dibuat, tetapi beberapa member gagal ditambahkan.')
       } else {
         toast.success(`Campaign dibuat: ${campaign.name}`)
       }
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+      queryClient.invalidateQueries({ queryKey: ['campaign', campaign.id] })
+      queryClient.invalidateQueries({ queryKey: ['campaign-members', campaign.id] })
       router.push(`/campaigns/${campaign.id}`)
     },
     onError: (error) => {

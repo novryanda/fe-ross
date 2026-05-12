@@ -54,6 +54,12 @@ function LoginForm() {
     return raw
   }, [searchParams])
 
+  const reasonMessage = useMemo(() => {
+    const reason = searchParams.get('reason')
+    if (reason === 'password_changed') return 'Password berhasil diubah. Silakan login dengan password baru.'
+    return null
+  }, [searchParams])
+
   const emailValid = EMAIL_REGEX.test(email)
   const formValid = emailValid && password.length > 0
   const submitting = isLoading || granted || booting
@@ -73,19 +79,14 @@ function LoginForm() {
     setError('')
 
     try {
-      const user = await login(email, password)
-      setGranted(true)
-      toast.success(`Access Granted: Welcome, ${user.name}`)
-      
-      // Start the cyber boot sequence transition
-      setTimeout(() => {
+      await login(email, password, () => {
+        setGranted(true)
         setBooting(true)
-        // Redirect after boot sequence completes (approx 3.8s)
-        setTimeout(() => {
-          router.replace(redirectTarget)
-        }, 4000)
-      }, 800)
-
+        toast.success(`Access Granted: System Initializing...`)
+      })
+      // When login returns, useAuth has called setUser(current).
+      // The global auth-provider will automatically handle the router.replace
+      // to the appropriate dashboard/role landing page.
     } catch (err: unknown) {
       const msg = mapApiErrorToToastMessage(err)
       setError(msg)
@@ -143,6 +144,25 @@ function LoginForm() {
               alt="ROSS Logo" 
             />
           </div>
+
+          {reasonMessage && (
+            <div style={{
+              marginBottom: '1.25rem',
+              padding: '0.75rem 1rem',
+              background: 'rgba(57,255,20,0.06)',
+              border: '1px solid rgba(57,255,20,0.25)',
+              borderRadius: 6,
+              color: '#39ff14',
+              fontSize: '0.75rem',
+              fontFamily: 'monospace',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.5rem',
+            }}>
+              <Check size={14} />
+              <span>{reasonMessage}</span>
+            </div>
+          )}
 
           <form onSubmit={handleLogin}>
             <div className="field">

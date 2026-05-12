@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 
 interface CyberLoadingProps {
@@ -64,10 +64,13 @@ export function CyberLoading({
   ] 
 }: CyberLoadingProps) {
   const [lines, setLines] = useState<string[]>([])
-  const [mounted, setMounted] = useState(false)
+  const mounted = useSyncExternalStore(
+    () => () => undefined,
+    () => true,
+    () => false,
+  )
 
   useEffect(() => {
-    setMounted(true)
     let current = 0
     const interval = setInterval(() => {
       if (current < messages.length) {

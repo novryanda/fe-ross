@@ -87,6 +87,22 @@ export function mapApiErrorToToastMessage(error: unknown): string {
       return error.details[0]?.message ?? "Input tidak valid.";
     case "CONFLICT":
       return "Terjadi konflik data. Muat ulang halaman lalu coba lagi.";
+    case "EXPORT_NOT_FOUND":
+      return "Export tidak ditemukan.";
+    case "EXPORT_NOT_READY":
+      return "Export belum siap diunduh.";
+    case "EXPORT_FILE_NOT_FOUND":
+      return "File export tidak ditemukan.";
+    case "EXPORT_STORAGE_ERROR":
+      return "Storage export sedang bermasalah. Coba lagi nanti.";
+    case "EXPORT_GENERATION_FAILED":
+      return "Export gagal dibuat. Silakan retry.";
+    case "EXPORT_STILL_PROCESSING":
+      return "Export masih diproses. Refresh beberapa saat lagi.";
+    case "EXPORT_ALREADY_PROCESSING":
+      return "Export dengan campaign, scope, dan format yang sama sedang diproses.";
+    case "EXPORT_RETRY_NOT_ALLOWED":
+      return "Export ini tidak dapat di-retry.";
     case "EMAIL_ALREADY_IN_USE":
       return "Email sudah digunakan oleh user lain.";
     case "LAST_ACTIVE_ADMIN":

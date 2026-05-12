@@ -1,28 +1,65 @@
 'use client'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { campaignsApi } from '@/lib/api/campaigns'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { StatusBadge, PlatformBadge } from '@/components/ui/badges'
 import { MetricCard, MetricCardSkeleton } from '@/components/ui/metric-card'
-import { getErrorMessage } from '@/lib/api/errors'
+import { getErrorMessage, mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { formatDate, getCampaignStatusConfig } from '@/lib/utils'
 import { useAuthStore } from '@/stores/auth-store'
-import { Plus, Search, MoreHorizontal, BarChart2, AlertCircle } from 'lucide-react'
+import { Plus, Search, MoreHorizontal, BarChart2, AlertCircle, Archive, Edit3, RotateCcw, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import type { CampaignStatus } from '@/types'
+import { toast } from 'sonner'
 
 export default function CampaignsPage() {
   const { user } = useAuthStore()
   const isAdmin = user?.role === 'ADMIN'
+  const queryClient = useQueryClient()
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
+  const [openActionId, setOpenActionId] = useState<string | null>(null)
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, 400)
+
+    return () => window.clearTimeout(timeout)
+  }, [search])
 
   const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ['campaigns', search, statusFilter],
-    queryFn: () => campaignsApi.list({ search: search || undefined, status: statusFilter || undefined }),
+    queryKey: ['campaigns', { search: debouncedSearch, status: statusFilter, page, limit }],
+    queryFn: () => campaignsApi.list({
+      page,
+      limit,
+      sortBy: 'createdAt',
+      sortOrder: 'desc',
+      search: debouncedSearch || undefined,
+      status: statusFilter || undefined,
+    }),
   })
 
   const campaigns = data?.data ?? []
+  const meta = data?.meta
+  const showingStart = meta && meta.total > 0 ? (meta.page - 1) * meta.limit + 1 : 0
+  const showingEnd = meta ? Math.min(meta.page * meta.limit, meta.total) : campaigns.length
+
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: CampaignStatus }) =>
+      campaignsApi.update(id, { status }),
+    onSuccess: (_campaign, variables) => {
+      toast.success(variables.status === 'ARCHIVED' ? 'Campaign diarchive.' : 'Campaign direstore.')
+      setOpenActionId(null)
+      queryClient.invalidateQueries({ queryKey: ['campaigns'] })
+      queryClient.invalidateQueries({ queryKey: ['campaign', variables.id] })
+    },
+    onError: (err) => toast.error(mapApiErrorToToastMessage(err)),
+  })
 
   return (
     <div>
@@ -45,7 +82,7 @@ export default function CampaignsPage() {
           Array.from({ length: 4 }).map((_, i) => <MetricCardSkeleton key={i} />)
         ) : (
           <>
-            <MetricCard label="Total Campaigns" value={campaigns.length} sparklineColor="var(--cyan)" />
+            <MetricCard label="Total Campaigns" value={meta?.total ?? campaigns.length} sparklineColor="var(--cyan)" />
             <MetricCard label="Active" value={campaigns.filter(c => c.status === 'ACTIVE').length} sparklineColor="var(--status-available)" />
             <MetricCard label="Completed" value={campaigns.filter(c => c.status === 'COMPLETED').length} sparklineColor="var(--status-completed)" />
             <MetricCard label="Draft" value={campaigns.filter(c => c.status === 'DRAFT').length} sparklineColor="var(--text-muted)" />
@@ -76,7 +113,7 @@ export default function CampaignsPage() {
             style={{ paddingLeft: '2.25rem' }}
           />
         </div>
-        <select className="input-field" style={{ width: 'auto' }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
+        <select className="input-field" style={{ width: 'auto' }} value={statusFilter} onChange={e => { setStatusFilter(e.target.value); setPage(1) }}>
           <option value="">All Statuses</option>
           {(['DRAFT', 'ACTIVE', 'COMPLETED', 'ARCHIVED'] as CampaignStatus[]).map(s => (
             <option key={s} value={s}>{getCampaignStatusConfig(s).label}</option>
@@ -150,7 +187,7 @@ export default function CampaignsPage() {
                   </td>
                   <td>
                     <div style={{ display: 'flex', gap: '0.25rem', flexWrap: 'wrap' }}>
-                      {campaign.platforms.length ? campaign.platforms.slice(0, 3).map(p => <PlatformBadge key={p} platform={p} size="sm" />) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>Backend belum menyediakan platform</span>}
+                      {campaign.platforms.length ? campaign.platforms.slice(0, 3).map(p => <PlatformBadge key={p} platform={p} size="sm" />) : <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>}
                       {campaign.platforms.length > 3 && <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>+{campaign.platforms.length - 3}</span>}
                     </div>
                   </td>
@@ -160,22 +197,62 @@ export default function CampaignsPage() {
                     </span>
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                      <div style={{ width: 80, height: 4, background: 'var(--bg-elevated)', borderRadius: 2, overflow: 'hidden' }}>
-                        <div style={{ height: '100%', width: `${campaign.completionRate ?? 0}%`, background: 'linear-gradient(90deg, var(--cyan), var(--violet))', borderRadius: 2 }} />
+                    {campaign.completionRate === undefined ? (
+                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>—</span>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <div style={{ width: 80, height: 4, background: 'var(--bg-elevated)', borderRadius: 2, overflow: 'hidden' }}>
+                          <div style={{ height: '100%', width: `${campaign.completionRate}%`, background: 'linear-gradient(90deg, var(--cyan), var(--violet))', borderRadius: 2 }} />
+                        </div>
+                        <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{campaign.completionRate}%</span>
                       </div>
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{campaign.completionRate ?? 0}%</span>
-                    </div>
+                    )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', gap: '0.5rem', position: 'relative', alignItems: 'center' }}>
                       <Link href={`/campaigns/${campaign.id}`} className="btn-ghost" style={{ padding: '0.25rem 0.625rem', fontSize: '0.75rem' }}>
                         View
                       </Link>
                       {isAdmin && (
-                        <button className="btn-ghost" style={{ padding: '0.25rem', fontSize: '0.75rem' }}>
+                        <button
+                          type="button"
+                          aria-haspopup="menu"
+                          aria-expanded={openActionId === campaign.id}
+                          className="btn-ghost"
+                          onClick={() => setOpenActionId(current => current === campaign.id ? null : campaign.id)}
+                          style={{ padding: '0.25rem', fontSize: '0.75rem', position: 'relative', zIndex: 3 }}
+                        >
                           <MoreHorizontal size={15} />
                         </button>
+                      )}
+                      {isAdmin && openActionId === campaign.id && (
+                        <div
+                          role="menu"
+                          style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '1.9rem',
+                            minWidth: 150,
+                            zIndex: 50,
+                            padding: '0.35rem',
+                            border: '1px solid var(--border-default)',
+                            borderRadius: 8,
+                            background: 'var(--bg-elevated)',
+                            boxShadow: '0 18px 40px rgba(0,0,0,0.35)',
+                          }}
+                        >
+                          <Link role="menuitem" href={`/campaigns/${campaign.id}`} className="btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', padding: '0.45rem 0.55rem', fontSize: '0.78rem', textDecoration: 'none' }}>View</Link>
+                          <Link role="menuitem" href={`/campaigns/${campaign.id}/edit`} className="btn-ghost" style={{ width: '100%', justifyContent: 'flex-start', padding: '0.45rem 0.55rem', fontSize: '0.78rem', textDecoration: 'none' }}><Edit3 size={13} /> Edit</Link>
+                          {campaign.status === 'ARCHIVED' ? (
+                            <button role="menuitem" type="button" className="btn-ghost" onClick={() => statusMutation.mutate({ id: campaign.id, status: 'ACTIVE' })} style={{ width: '100%', justifyContent: 'flex-start', padding: '0.45rem 0.55rem', fontSize: '0.78rem' }}>
+                              <RotateCcw size={13} /> Restore
+                            </button>
+                          ) : (
+                            <button role="menuitem" type="button" className="btn-ghost" onClick={() => statusMutation.mutate({ id: campaign.id, status: 'ARCHIVED' })} style={{ width: '100%', justifyContent: 'flex-start', padding: '0.45rem 0.55rem', fontSize: '0.78rem' }}>
+                              <Archive size={13} /> Archive
+                            </button>
+                          )}
+                        </div>
                       )}
                     </div>
                   </td>
@@ -184,6 +261,25 @@ export default function CampaignsPage() {
             )}
           </tbody>
         </table>
+        {meta && (
+          <div className="pagination-footer">
+            <span>Showing {showingStart}–{showingEnd} of {meta.total} campaigns</span>
+            <div className="pager">
+              <button type="button" aria-label="Previous page" disabled={meta.page <= 1} onClick={() => setPage(current => Math.max(1, current - 1))}>
+                <ChevronLeft size={15} />
+              </button>
+              <span>{meta.page} / {Math.max(meta.totalPages, 1)}</span>
+              <button type="button" aria-label="Next page" disabled={meta.page >= meta.totalPages} onClick={() => setPage(current => current + 1)}>
+                <ChevronRight size={15} />
+              </button>
+              <select className="input-field" value={limit} onChange={event => { setLimit(Number(event.target.value)); setPage(1) }} style={{ width: 112, padding: '0.45rem 0.6rem' }}>
+                <option value={10}>10 per page</option>
+                <option value={20}>20 per page</option>
+                <option value={50}>50 per page</option>
+              </select>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )

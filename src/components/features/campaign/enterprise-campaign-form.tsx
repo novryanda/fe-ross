@@ -1,11 +1,12 @@
 'use client'
 import { useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertCircle, CalendarDays, CheckCircle2, Circle, FileText, Flag, Info, Save, Send, Shield, Users } from 'lucide-react'
+import { AlertCircle, CalendarDays, CheckCircle2, Circle, FileText, Flag, Info, Save, Send, Shield, Users, Plus, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { PlatformBadge, StatusBadge, RoleBadge } from '@/components/ui/badges'
 import type { CampaignStatus, Platform } from '@/types'
+import { AddCampaignMemberModal } from './add-campaign-member-modal'
 
 export type CampaignMemberRole = 'ADMIN' | 'BUZZER' | 'VIEWER'
 
@@ -13,6 +14,7 @@ export interface MockMember {
   id: string
   name: string
   role: CampaignMemberRole
+  email?: string
 }
 
 export interface ChecklistItem {
@@ -68,22 +70,16 @@ export function initials(name: string) {
   return name.split(' ').map(part => part.charAt(0)).join('').slice(0, 2).toUpperCase()
 }
 
-export function SectionHeader({ number, title, icon }: { number: number; title: string; icon: ReactNode }) {
+export function SectionHeader({ number, title, icon, action }: { number: number; title: string; icon: ReactNode; action?: ReactNode }) {
   return (
-    <div className="section-number-title">
-      <span className="section-number">{number}</span>
-      <span style={{ color: 'var(--cyan)', display: 'flex' }}>{icon}</span>
-      <strong>{title}</strong>
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+      <div className="section-number-title" style={{ marginBottom: 0 }}>
+        <span className="section-number">{number}</span>
+        <span style={{ color: 'var(--cyan)', display: 'flex' }}>{icon}</span>
+        <strong>{title}</strong>
+      </div>
+      {action}
     </div>
-  )
-}
-
-export function UserChip({ user }: { user: MockMember }) {
-  return (
-    <span className="selected-chip">
-      <span className="mini-avatar" style={{ width: 20, height: 20, borderRadius: 7, fontSize: '0.58rem' }}>{initials(user.name)}</span>
-      {user.name}
-    </span>
   )
 }
 
@@ -99,6 +95,7 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
   const [buzzerIds, setBuzzerIds] = useState<string[]>([])
   const [viewerIds, setViewerIds] = useState<string[]>([])
   const [notes, setNotes] = useState('')
+  const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
 
   const admins = availableMembers.filter(user => user.role === 'ADMIN')
   const buzzers = availableMembers.filter(user => user.role === 'BUZZER')
@@ -130,6 +127,12 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
       return
     }
     setter(current.includes(id) ? current.filter(item => item !== id) : [...current, id])
+  }
+
+  const handleConfirmMembers = (users: MockMember[]) => {
+    setAdminIds(users.filter(u => u.role === 'ADMIN').map(u => u.id))
+    setBuzzerIds(users.filter(u => u.role === 'BUZZER').map(u => u.id))
+    setViewerIds(users.filter(u => u.role === 'VIEWER').map(u => u.id))
   }
 
   const buildPayload = (draftStatus: Extract<CampaignStatus, 'DRAFT' | 'ACTIVE'> = status): EnterpriseCampaignPayload => ({
@@ -273,18 +276,46 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
           </section>
 
           <section className="campaign-create-section">
-            <SectionHeader number={5} title="Campaign Members" icon={<Users size={15} />} />
+            <SectionHeader 
+              number={5} 
+              title="Campaign Members" 
+              icon={<Users size={15} />} 
+              action={
+                <Button type="button" variant="secondary" size="sm" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={14} />}>
+                  Add Member
+                </Button>
+              }
+            />
             <p className="section-helper-text">Assignment ini berlaku untuk Campaign. Blast Link baru otomatis terbuka untuk semua Buzzer member campaign.</p>
             {membersLoading && <p className="muted-meta">Memuat user aktif...</p>}
-            <div className="member-grid">
-              <MemberColumn title="Admin" required users={admins} selectedIds={adminIds} onToggle={id => toggleId(id, adminIds, setAdminIds, true)} />
-              <MemberColumn title="Buzzers" required users={buzzers} selectedIds={buzzerIds} onToggle={id => toggleId(id, buzzerIds, setBuzzerIds)} />
-              <MemberColumn title="Viewers" users={viewers} selectedIds={viewerIds} onToggle={id => toggleId(id, viewerIds, setViewerIds)} />
-            </div>
-            <div className="selected-chip-row">
-              {[...selectedAdmins, ...selectedBuzzers, ...selectedViewers].map(user => <UserChip key={user.id} user={user} />)}
-              {!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length && <span className="muted-meta">Belum ada member dipilih.</span>}
-            </div>
+            
+            {(!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length) ? (
+              <div style={{ padding: '2.5rem', textAlign: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 12, background: 'var(--bg-surface)' }}>
+                <Users size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem', opacity: 0.5 }} />
+                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Belum ada member dipilih. Klik Add Member untuk menambahkan user.</p>
+                <Button type="button" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={16} />}>Add Member</Button>
+              </div>
+            ) : (
+              <div className="member-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
+                <MemberGroup 
+                  title="ADMIN" 
+                  users={selectedAdmins} 
+                  required 
+                  onRemove={(id) => setAdminIds(prev => prev.filter(x => x !== id))} 
+                />
+                <MemberGroup 
+                  title="BUZZERS" 
+                  users={selectedBuzzers} 
+                  required={status === 'ACTIVE'} 
+                  onRemove={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))} 
+                />
+                <MemberGroup 
+                  title="VIEWERS" 
+                  users={selectedViewers} 
+                  onRemove={(id) => setViewerIds(prev => prev.filter(x => x !== id))} 
+                />
+              </div>
+            )}
           </section>
 
           <section className="campaign-create-section">
@@ -328,30 +359,60 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
           </div>
         </div>
       </aside>
+
+      <AddCampaignMemberModal
+        open={isMemberModalOpen}
+        onOpenChange={setIsMemberModalOpen}
+        availableMembers={availableMembers}
+        selectedUserIds={[...adminIds, ...buzzerIds, ...viewerIds]}
+        onConfirm={handleConfirmMembers}
+      />
     </div>
   )
 }
 
-export function MemberColumn({ title, required, users, selectedIds, onToggle }: { title: string; required?: boolean; users: MockMember[]; selectedIds: string[]; onToggle: (id: string) => void }) {
+export function MemberGroup({ title, required, users, onRemove }: { title: string; required?: boolean; users: MockMember[]; onRemove: (id: string) => void }) {
+  if (users.length === 0 && !required) return null
+
   return (
     <div>
-      <div className="member-column-title">{title} {required && <span className="required-dot">Required</span>}</div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
+        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: 1 }}>{title}</h4>
+        <span style={{ fontSize: '0.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '0 6px', borderRadius: 12 }}>{users.length}</span>
+        {required && <span className="required-dot" style={{ marginLeft: 'auto' }}>REQUIRED</span>}
+      </div>
+      
       <div style={{ display: 'grid', gap: '0.5rem' }}>
         {users.length === 0 ? (
-          <div className="muted-meta" style={{ padding: '0.65rem 0' }}>Tidak ada user aktif.</div>
-        ) : users.map(user => {
-          const selected = selectedIds.includes(user.id)
-          return (
-            <button key={user.id} type="button" className={`member-select-row ${selected ? 'selected' : ''}`} onClick={() => onToggle(user.id)}>
-              <span className="mini-avatar">{initials(user.name)}</span>
-              <span style={{ minWidth: 0 }}>
-                <span style={{ display: 'block', fontWeight: 800 }}>{user.name}</span>
-                <span className="muted-meta">{user.role}</span>
-              </span>
-              {selected && <CheckCircle2 size={15} style={{ color: 'var(--status-active)', marginLeft: 'auto' }} />}
-            </button>
-          )
-        })}
+          <div style={{ padding: '0.75rem', border: '1px dashed var(--border-subtle)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+            Belum ada member
+          </div>
+        ) : (
+          users.map(user => (
+            <div key={user.id} style={{
+              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.75rem',
+              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8
+            }}>
+              <div className="mini-avatar" style={{ width: 32, height: 32, fontSize: '0.85rem' }}>{initials(user.name)}</div>
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
+                {user.email && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>}
+                <div style={{ marginTop: 2 }}><RoleBadge role={user.role} /></div>
+              </div>
+              <button 
+                type="button"
+                onClick={() => onRemove(user.id)}
+                style={{
+                  background: 'rgba(255,0,60,0.1)', border: 'none', color: 'var(--red)', 
+                  padding: 6, borderRadius: 6, cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0
+                }}
+                title="Remove Member"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))
+        )}
       </div>
     </div>
   )

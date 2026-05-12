@@ -106,3 +106,32 @@ export function PlatformBadge({ platform, size = 'md' }: { platform: Platform; s
     </span>
   )
 }
+
+export function RoleBadge({ role, size = 'md' }: { role: string; size?: 'sm' | 'md' }) {
+  let color = 'var(--text-muted)'
+  let bg = 'rgba(255,255,255,0.05)'
+  
+  if (role === 'ADMIN') {
+    color = 'var(--cyan)'
+    bg = 'rgba(0, 240, 255, 0.1)'
+  } else if (role === 'BUZZER') {
+    color = '#8b5cf6'
+    bg = 'rgba(139, 92, 246, 0.1)'
+  } else if (role === 'VIEWER') {
+    color = '#39ff14'
+    bg = 'rgba(57, 255, 20, 0.1)'
+  }
+
+  return (
+    <span style={{
+      display: 'inline-flex', alignItems: 'center',
+      padding: size === 'sm' ? '0.15rem 0.4rem' : '0.2rem 0.5rem',
+      borderRadius: 4, background: bg, color: color,
+      fontSize: size === 'sm' ? '0.6rem' : '0.65rem', fontWeight: 700,
+      letterSpacing: '0.04em', textTransform: 'uppercase',
+      border: `1px solid ${color}40`,
+    }}>
+      {role}
+    </span>
+  )
+}

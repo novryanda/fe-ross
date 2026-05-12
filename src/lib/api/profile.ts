@@ -19,7 +19,6 @@ export interface UpdateProfileDto {
 export interface ChangePasswordDto {
   currentPassword: string;
   newPassword: string;
-  confirmPassword: string;
   revokeOtherSessions?: boolean;
 }
 
@@ -124,13 +123,6 @@ export const profileApi = {
   },
 
   async changePassword(dto: ChangePasswordDto): Promise<{ success: boolean }> {
-    if (dto.newPassword !== dto.confirmPassword) {
-      throw new ApiError(
-        "PASSWORD_CONFIRMATION_MISMATCH",
-        "Konfirmasi password tidak cocok.",
-        [{ field: "confirmPassword", message: "Must match newPassword." }],
-      );
-    }
     if (dto.newPassword === dto.currentPassword) {
       throw new ApiError(
         "PASSWORD_UNCHANGED",

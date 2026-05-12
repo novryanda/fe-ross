@@ -8,6 +8,13 @@ import type { User, UserRole } from "@/types";
 
 const MOCK_SESSION_STORAGE_KEY = "mock_user";
 
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function withMinimumDelay<T>(promise: Promise<T>, delayMs = 1000): Promise<T> {
+  const [result] = await Promise.all([promise, wait(delayMs)]);
+  return result;
+}
+
 /**
  * Single entry point for all auth state reads/writes from React components.
  *
@@ -26,13 +33,23 @@ export function useAuth() {
   const role = user?.role ?? null;
 
   const login = useCallback(
-    async (email: string, password: string): Promise<User> => {
+    async (email: string, password: string, onValidCredentials?: () => void): Promise<User> => {
       setLoading(true);
       try {
         const signedIn = await authApi.login(email, password);
+        
+        if (onValidCredentials) {
+          onValidCredentials();
+        }
+
         // `authApi.login` already returns the fresh user; still call getMe in
         // real mode to defeat any cookie-cache lag between sign-in and /me.
-        const current = (await authApi.getMe()) ?? signedIn;
+        // We wrap this in withMinimumDelay to ensure the boot screen is visible.
+        const current = await withMinimumDelay(
+          authApi.getMe().then(me => me ?? signedIn),
+          1200
+        );
+        
         setUser(current);
         return current;
       } finally {

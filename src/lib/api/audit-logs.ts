@@ -3,6 +3,7 @@
  *
  * Real-mode endpoints (module 13):
  *   GET /api/v1/audit-logs                         (ADMIN)
+ *   GET /api/v1/audit-logs/:auditLogId             (ADMIN)
  *   GET /api/v1/campaigns/:campaignId/audit-logs   (ADMIN)
  *
  * Both endpoints return a nested envelope:
@@ -95,6 +96,20 @@ function applyMockFilters(
 }
 
 export const auditLogsApi = {
+  async getAuditLog(auditLogId: string): Promise<AuditLog> {
+    if (isMockMode()) {
+      await delay(MOCK_LATENCY_MS);
+      const found = mockAuditLogs.find((log) => log.id === auditLogId);
+      if (!found) {
+        throw new Error("Audit log tidak ditemukan.");
+      }
+      return found;
+    }
+
+    const res = await apiClient.get<unknown>(`/audit-logs/${auditLogId}`);
+    return toAuditLog(res.data);
+  },
+
   async list(
     params?: ListAuditLogsParams,
   ): Promise<{ data: AuditLog[]; meta: PaginationMeta }> {

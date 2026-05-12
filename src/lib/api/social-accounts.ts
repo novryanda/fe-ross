@@ -61,9 +61,18 @@ export const socialAccountsApi = {
             (a.displayName?.toLowerCase().includes(q) ?? false),
         );
       }
+      const page = params.page ?? 1;
+      const limit = params.limit ?? 20;
+      const start = (page - 1) * limit;
+      const paged = data.slice(start, start + limit);
       return {
-        data,
-        meta: { page: 1, limit: 20, total: data.length, totalPages: 1 },
+        data: paged,
+        meta: {
+          page,
+          limit,
+          total: data.length,
+          totalPages: Math.max(1, Math.ceil(data.length / limit)),
+        },
       };
     }
     const response = await apiClient.get<SocialAccount[]>("/social-accounts", {
@@ -80,7 +89,10 @@ export const socialAccountsApi = {
         page: params.page ?? 1,
         limit: params.limit ?? 20,
         total: response.data.length,
-        totalPages: 1,
+        totalPages: Math.max(
+          1,
+          Math.ceil(response.data.length / (params.limit ?? 20)),
+        ),
       },
     };
   },

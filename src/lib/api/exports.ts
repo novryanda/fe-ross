@@ -2,9 +2,11 @@
  * Exports API adapter — mock + real backend contract v1.3.
  *
  * Real-mode endpoints (module 14):
- *   POST /api/v1/campaigns/:campaignId/exports   (ADMIN)    body: { format }
+ *   POST /api/v1/campaigns/:campaignId/exports   (ADMIN)
  *   GET  /api/v1/exports                         (ADMIN,VIEWER)
  *   GET  /api/v1/exports/:exportId               (ADMIN,VIEWER)
+ *   GET  /api/v1/exports/:exportId/download      (ADMIN,VIEWER)
+ *   POST /api/v1/exports/:exportId/retry         (ADMIN)
  *
  * Mock mode keeps a local in-memory copy of `mockExports` so UI flows stay
  * functional without the backend. Pages should call this adapter directly
@@ -14,9 +16,10 @@ import type {
   ExportFormat,
   ExportRecord,
   ExportScope,
+  ExportStatus,
   PaginationMeta,
 } from "@/types";
-import { apiClient, isMockMode } from "./client";
+import { API_BASE_URL, apiClient, isMockMode } from "./client";
 import { ApiError } from "./errors";
 import {
   toCreateExportDto,
@@ -35,6 +38,12 @@ function delay(ms: number): Promise<void> {
 // data in ways that surprise other pages between navigations.
 const mockExports: ExportRecord[] = [...seedMockExports];
 
+function asRecord(value: unknown): Record<string, unknown> {
+  return typeof value === "object" && value !== null
+    ? (value as Record<string, unknown>)
+    : {};
+}
+
 function fallbackMeta(
   params: ListExportsParams | undefined,
   total: number,
@@ -49,12 +58,45 @@ function fallbackMeta(
   };
 }
 
+function parseContentDispositionFileName(value: string | null): string | null {
+  if (!value) return null;
+  const utf8 = value.match(/filename\*=UTF-8''([^;]+)/i)?.[1];
+  if (utf8) return decodeURIComponent(utf8);
+  const quoted = value.match(/filename="([^"]+)"/i)?.[1];
+  if (quoted) return quoted;
+  return value.match(/filename=([^;]+)/i)?.[1]?.trim() ?? null;
+}
+
+async function parseDownloadError(response: Response): Promise<ApiError> {
+  try {
+    const payload = (await response.json()) as unknown;
+    const record = asRecord(payload);
+    const error = asRecord(record.error);
+    const code =
+      typeof error.code === "string" ? error.code : "REQUEST_ERROR";
+    const message =
+      typeof error.message === "string"
+        ? error.message
+        : response.statusText || "Gagal mengunduh export.";
+    const details = Array.isArray(error.details) ? error.details : [];
+    return new ApiError(code, message, details, response.status);
+  } catch {
+    return new ApiError(
+      response.status === 404 ? "EXPORT_FILE_NOT_FOUND" : "REQUEST_ERROR",
+      response.statusText || "Gagal mengunduh export.",
+      [],
+      response.status,
+    );
+  }
+}
+
 export interface ListExportsParams {
   page?: number;
   limit?: number;
   campaignId?: string;
   format?: ExportFormat | "";
-  status?: string;
+  scope?: ExportScope | "";
+  status?: ExportStatus | "";
   requestedBy?: string;
   dateFrom?: string;
   dateTo?: string;
@@ -71,6 +113,7 @@ function applyMockFilters(
   if (params.campaignId)
     items = items.filter((e) => e.campaignId === params.campaignId);
   if (params.format) items = items.filter((e) => e.format === params.format);
+  if (params.scope) items = items.filter((e) => e.scope === params.scope);
   if (params.status) items = items.filter((e) => e.status === params.status);
   if (params.requestedBy)
     items = items.filter((e) => e.requestedBy === params.requestedBy);
@@ -98,11 +141,12 @@ export const exportsApi = {
       const data = applyMockFilters(mockExports, params);
       return { data, meta: fallbackMeta(params, data.length) };
     }
-    const res = await apiClient.get<unknown[]>("/exports", {
+    const res = await apiClient.get<unknown>("/exports", {
       page: params?.page,
       limit: params?.limit,
       campaignId: params?.campaignId,
       format: params?.format || undefined,
+      scope: params?.scope || undefined,
       status: params?.status || undefined,
       requestedBy: params?.requestedBy,
       dateFrom: params?.dateFrom,
@@ -110,9 +154,19 @@ export const exportsApi = {
       sortBy: params?.sortBy,
       sortOrder: params?.sortOrder,
     });
+    const payload = asRecord(res.data);
+    const items = Array.isArray(res.data)
+      ? res.data
+      : Array.isArray(payload.items)
+        ? payload.items
+        : [];
+    const meta =
+      (payload.pagination as PaginationMeta | undefined) ??
+      (payload.meta as PaginationMeta | undefined) ??
+      res.meta;
     return {
-      data: res.data.map(toExportRecord),
-      meta: res.meta ?? fallbackMeta(params, res.data.length),
+      data: items.map(toExportRecord),
+      meta: meta ?? fallbackMeta(params, items.length),
     };
   },
 
@@ -135,12 +189,6 @@ export const exportsApi = {
     return toExportRecord(res.data);
   },
 
-  /**
-   * Request a new export for a campaign. Backend MVP accepts `{ format }`
-   * only and always generates a full snapshot; FE `scope` is recorded in
-   * the mock record so the UI stays consistent but is ignored by real mode
-   * until backend support lands.
-   */
   async create(
     campaignId: string,
     form: CreateExportForm,
@@ -155,9 +203,13 @@ export const exportsApi = {
           ?.campaignName,
         format: form.format,
         scope: form.scope ?? "FULL",
+        dateFrom: form.dateFrom || undefined,
+        dateTo: form.dateTo || undefined,
         status: "PROCESSING",
         requestedBy: "user-admin-1",
         requestedByName: "Reza Admin",
+        requestedAt: now,
+        startedAt: now,
         createdAt: now,
       };
       mockExports.unshift(created);
@@ -169,8 +221,14 @@ export const exportsApi = {
           ...mockExports[idx],
           status: "COMPLETED",
           completedAt: new Date().toISOString(),
-          downloadUrl: `/api/v1/exports/${created.id}/download.${form.format === "PDF" ? "pdf" : "xlsx"}`,
+          fileName: `export_${created.campaignId}_${created.id}.${form.format === "PDF" ? "pdf" : "xlsx"}`,
+          fileUrl: `/api/v1/exports/${created.id}/download`,
+          downloadUrl: `/api/v1/exports/${created.id}/download`,
           fileSize: 150000,
+          mimeType:
+            form.format === "PDF"
+              ? "application/pdf"
+              : "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         };
       }, 2000);
       return created;
@@ -191,16 +249,113 @@ export const exportsApi = {
     campaignId: string,
     format: ExportFormat,
     scope: ExportScope = "FULL",
+    dateFrom?: string,
+    dateTo?: string,
   ): Promise<ExportRecord> {
-    return exportsApi.create(campaignId, { format, scope });
+    return exportsApi.create(campaignId, { format, scope, dateFrom, dateTo });
   },
 
-  /**
-   * Resolve the absolute URL for downloading a completed export. Returns
-   * `null` when the backend has not produced a downloadable asset yet.
-   */
-  downloadUrl(record: ExportRecord): string | null {
-    if (!record.downloadUrl) return null;
-    return record.downloadUrl;
+  async retryExport(exportId: string): Promise<ExportRecord> {
+    if (isMockMode()) {
+      await delay(400);
+      const source = mockExports.find((e) => e.id === exportId);
+      if (!source) throw new ApiError("NOT_FOUND", "Export tidak ditemukan.");
+      if (source.status !== "FAILED") {
+        throw new ApiError(
+          "EXPORT_RETRY_NOT_ALLOWED",
+          "Hanya export FAILED yang dapat di-retry.",
+        );
+      }
+
+      const now = new Date().toISOString();
+      const created: ExportRecord = {
+        ...source,
+        id: `exp-retry-${Date.now()}`,
+        status: "PROCESSING",
+        fileName: undefined,
+        fileUrl: undefined,
+        downloadUrl: undefined,
+        fileSize: undefined,
+        mimeType: undefined,
+        errorMessage: undefined,
+        retriedFromId: source.id,
+        requestedAt: now,
+        startedAt: now,
+        completedAt: undefined,
+        failedAt: undefined,
+        createdAt: now,
+      };
+      mockExports.unshift(created);
+      setTimeout(() => {
+        const idx = mockExports.findIndex((e) => e.id === created.id);
+        if (idx === -1) return;
+        mockExports[idx] = {
+          ...mockExports[idx],
+          status: "COMPLETED",
+          completedAt: new Date().toISOString(),
+          fileName: `export_${created.campaignId}_${created.id}.${created.format === "PDF" ? "pdf" : "xlsx"}`,
+          fileUrl: `/api/v1/exports/${created.id}/download`,
+          downloadUrl: `/api/v1/exports/${created.id}/download`,
+          fileSize: 150000,
+        };
+      }, 2000);
+      return created;
+    }
+
+    const res = await apiClient.post<unknown>(`/exports/${exportId}/retry`);
+    return toExportRecord(res.data);
+  },
+
+  getDownloadUrl(exportId: string): string {
+    return `${API_BASE_URL}/exports/${exportId}/download`;
+  },
+
+  async downloadExport(record: ExportRecord): Promise<void> {
+    if (record.status !== "COMPLETED") {
+      throw new ApiError("EXPORT_NOT_READY", "Export belum siap diunduh.");
+    }
+
+    if (isMockMode()) {
+      const fileName =
+        record.fileName ??
+        `export.${record.format === "PDF" ? "pdf" : "xlsx"}`;
+      const blob = new Blob([`Mock export ${record.id}`], {
+        type: record.mimeType ?? "application/octet-stream",
+      });
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(objectUrl);
+      return;
+    }
+
+    const response = await fetch(exportsApi.getDownloadUrl(record.id), {
+      method: "GET",
+      credentials: "include",
+    });
+
+    if (!response.ok) {
+      throw await parseDownloadError(response);
+    }
+
+    const blob = await response.blob();
+    const disposition = response.headers.get("Content-Disposition");
+    const headerFileName = parseContentDispositionFileName(disposition);
+    const fileName =
+      headerFileName ??
+      record.fileName ??
+      `export.${record.format === "PDF" ? "pdf" : "xlsx"}`;
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(objectUrl);
   },
 };

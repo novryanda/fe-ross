@@ -143,7 +143,7 @@ export default function AuditPage() {
             description="Aktivitas penting sistem akan tercatat di sini."
           />
         ) : (
-          <AuditLogTable logs={filteredLogs} />
+          <AuditLogTable logs={filteredLogs} onLoadDetail={auditLogsApi.getAuditLog} />
         )}
       </div>
     </RoleGuard>

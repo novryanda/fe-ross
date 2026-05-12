@@ -1,5 +1,5 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { AlertTriangle, CheckCircle2, Clock3, Info, RadioTower, Target, Zap } from 'lucide-react'
 import { blastApi } from '@/lib/api/blast'
@@ -13,16 +13,50 @@ import { formatNumber } from '@/lib/utils'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
-import type { BlastAttemptStatus, BlastTarget, BlastTargetStatus, Platform } from '@/types'
+import type { BlastAttemptStatus, BlastTarget, BlastTargetStatus, PaginationMeta, Platform } from '@/types'
+
+type BlastTargetsResponse = {
+  data: BlastTarget[]
+  meta: PaginationMeta
+}
+
+function updateBlastTargetStatusInResponse(
+  old: BlastTargetsResponse | undefined,
+  targetId: string,
+  status: BlastTargetStatus,
+): BlastTargetsResponse | undefined {
+  if (!old) return old
+
+  return {
+    ...old,
+    data: old.data.map(target =>
+      target.id === targetId
+        ? { ...target, status, updatedAt: new Date().toISOString() }
+        : target,
+    ),
+  }
+}
 
 export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
   const { isAdmin } = useAuth()
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [attemptFilter, setAttemptFilter] = useState('')
   const [sort, setSort] = useState('newest')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const queryClient = useQueryClient()
+
+  useEffect(() => {
+    const timeout = window.setTimeout(() => {
+      setDebouncedSearch(search.trim())
+      setPage(1)
+    }, 400)
+
+    return () => window.clearTimeout(timeout)
+  }, [search])
 
   const sortParams = sort === 'oldest'
     ? { sortBy: 'createdAt', sortOrder: 'asc' as const }
@@ -30,24 +64,55 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
       ? { sortBy: 'createdAt', sortOrder: 'desc' as const }
       : { sortBy: 'createdAt', sortOrder: 'desc' as const }
 
-  const { data: targets, isLoading, isError, error } = useQuery({
-    queryKey: ['blast-targets', campaignId, { search, platformFilter, statusFilter, sort }],
+  const { data: targetResponse, isLoading, isError, error } = useQuery({
+    queryKey: ['blast-targets', campaignId, { search: debouncedSearch, platformFilter, statusFilter, sort, page, limit }],
     queryFn: () => blastApi.listTargets(campaignId, {
-      search,
+      page,
+      limit,
+      search: debouncedSearch || undefined,
       platform: platformFilter as Platform | '',
       status: statusFilter as BlastTargetStatus | '',
       ...sortParams,
     }),
   })
 
+  const targets = useMemo(() => targetResponse?.data ?? [], [targetResponse?.data])
+  const meta = targetResponse?.meta
+
   const statusMutation = useMutation({
     mutationFn: ({ target, status }: { target: BlastTarget; status: BlastTargetStatus }) =>
       blastApi.updateTargetStatus(campaignId, target.id, status),
-    onSuccess: (_target, variables) => {
-      toast.success(variables.status === 'ACTIVE' ? 'Blast target kembali active.' : variables.status === 'PAUSED' ? 'Blast target dipause.' : 'Blast target diarchive.')
-      queryClient.invalidateQueries({ queryKey: ['blast-targets', campaignId] })
+    onMutate: async ({ target, status }) => {
+      await queryClient.cancelQueries({ queryKey: ['blast-targets', campaignId] })
+
+      const previousLists = queryClient.getQueriesData<BlastTargetsResponse>({
+        queryKey: ['blast-targets', campaignId],
+      })
+
+      queryClient.setQueriesData<BlastTargetsResponse>(
+        { queryKey: ['blast-targets', campaignId] },
+        old => updateBlastTargetStatusInResponse(old, target.id, status),
+      )
+
+      return { previousLists }
     },
-    onError: (err) => toast.error(mapApiErrorToToastMessage(err)),
+    onError: (err, _variables, context) => {
+      context?.previousLists.forEach(([queryKey, previous]) => {
+        queryClient.setQueryData(queryKey, previous)
+      })
+      toast.error(mapApiErrorToToastMessage(err))
+    },
+    onSuccess: (target, variables) => {
+      queryClient.setQueriesData<BlastTargetsResponse>(
+        { queryKey: ['blast-targets', campaignId] },
+        old => updateBlastTargetStatusInResponse(old, target.id, target.status),
+      )
+      toast.success(variables.status === 'ACTIVE' ? 'Blast target kembali active.' : variables.status === 'PAUSED' ? 'Blast target dipause.' : 'Blast target diarchive.')
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({ queryKey: ['blast-targets', campaignId] })
+      queryClient.invalidateQueries({ queryKey: ['campaign-dashboard', campaignId] })
+    },
   })
 
   const reblastMutation = useMutation({
@@ -56,12 +121,13 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
       toast.success(`Reblast attempt #${attempt.attemptNo} dibuat.`)
       queryClient.invalidateQueries({ queryKey: ['blast-targets', campaignId] })
       queryClient.invalidateQueries({ queryKey: ['blast-attempts', campaignId] })
+      queryClient.invalidateQueries({ queryKey: ['campaign-dashboard', campaignId] })
     },
     onError: (err) => toast.error(mapApiErrorToToastMessage(err)),
   })
 
   const stats = useMemo(() => {
-    const list = targets ?? []
+    const list = targets
     const attempts = list.flatMap(target => target.attempts ?? (target.latestAttempt ? [target.latestAttempt] : []))
     const available = attempts.filter(attempt => attempt.status === 'AVAILABLE').length
     const kept = attempts.filter(attempt => attempt.status === 'KEPT').length
@@ -76,15 +142,9 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
   }, [targets])
 
   const filtered = useMemo(() => {
-    const query = search.trim().toLowerCase()
-    return [...(targets ?? [])]
+    return [...targets]
       .filter(target => {
         const latestStatus = target.latestAttempt?.status
-        if (query && !(
-          target.socialAccount?.username?.toLowerCase().includes(query) ||
-          target.socialAccount?.displayName?.toLowerCase().includes(query) ||
-          target.postUrl.toLowerCase().includes(query)
-        )) return false
         if (platformFilter && target.platform !== platformFilter as Platform) return false
         if (statusFilter && target.status !== statusFilter as BlastTargetStatus) return false
         if (attemptFilter && latestStatus !== attemptFilter as BlastAttemptStatus) return false
@@ -95,7 +155,19 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
         if (sort === 'attempts') return (b.totalAttempts ?? 0) - (a.totalAttempts ?? 0)
         return 0
       })
-  }, [attemptFilter, platformFilter, search, sort, statusFilter, targets])
+  }, [attemptFilter, platformFilter, sort, statusFilter, targets])
+
+  const actionLoading = statusMutation.isPending
+    ? {
+        id: (statusMutation.variables as { target?: BlastTarget } | undefined)?.target?.id ?? '',
+        type: 'status' as const,
+      }
+    : reblastMutation.isPending
+      ? {
+          id: reblastMutation.variables?.id ?? '',
+          type: 'reblast' as const,
+        }
+      : undefined
 
   return (
     <>
@@ -116,7 +188,7 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
       </div>
 
       <div className="blast-metric-grid">
-        <BlastMetricCard label="Total Blast Targets" value={formatNumber(targets?.length ?? 0)} sub="Registered target posts" icon={<Target size={22} />} accent="var(--cyan)" />
+        <BlastMetricCard label="Total Blast Targets" value={formatNumber(meta?.total ?? targets.length)} sub="Registered target posts" icon={<Target size={22} />} accent="var(--cyan)" />
         <BlastMetricCard label="Available Attempts" value={formatNumber(stats.available)} sub="Ready for Buzzer Keep" icon={<RadioTower size={22} />} accent="var(--status-active)" />
         <BlastMetricCard label="Kept / Claimed" value={formatNumber(stats.kept)} sub="Locked by one Buzzer" icon={<Zap size={22} />} accent="var(--status-kept)" />
         <BlastMetricCard label="Completed Attempts" value={formatNumber(stats.completed)} sub="Reports submitted" icon={<CheckCircle2 size={22} />} accent="var(--status-completed)" />
@@ -127,13 +199,13 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
         search={search}
         onSearchChange={setSearch}
         platform={platformFilter}
-        onPlatformChange={setPlatformFilter}
+        onPlatformChange={(value) => { setPlatformFilter(value); setPage(1) }}
         status={statusFilter}
-        onStatusChange={setStatusFilter}
+        onStatusChange={(value) => { setStatusFilter(value); setPage(1) }}
         attempt={attemptFilter}
-        onAttemptChange={setAttemptFilter}
+        onAttemptChange={(value) => { setAttemptFilter(value); setPage(1) }}
         sort={sort}
-        onSortChange={setSort}
+        onSortChange={(value) => { setSort(value); setPage(1) }}
       />
 
       {isLoading ? (
@@ -160,10 +232,14 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
         <BlastLinksTable
           campaignId={campaignId}
           targets={filtered}
+          meta={meta}
+          pageSize={limit}
           isAdmin={isAdmin}
-          actionLoadingId={(statusMutation.variables as { target?: BlastTarget } | undefined)?.target?.id ?? reblastMutation.variables?.id}
+          actionLoading={actionLoading?.id ? actionLoading : undefined}
           onStatusChange={(target, status) => statusMutation.mutate({ target, status })}
           onReblast={(target) => reblastMutation.mutate(target)}
+          onPageChange={setPage}
+          onPageSizeChange={(value) => { setLimit(value); setPage(1) }}
         />
       )}
     </>

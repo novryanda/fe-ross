@@ -9,6 +9,7 @@ import type {
   BlastReport,
   BlastTarget,
   BlastTargetStatus,
+  PaginationMeta,
   Platform,
   SubmitBlastReportForm,
 } from "@/types";
@@ -41,6 +42,20 @@ export interface ListBlastTargetsParams {
   search?: string;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
+}
+
+function fallbackMeta(
+  params: Pick<ListBlastTargetsParams, "page" | "limit"> | undefined,
+  total: number,
+): PaginationMeta {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
 }
 
 export interface ListBlastAttemptsParams {
@@ -96,30 +111,40 @@ export const blastApi = {
   async listTargets(
     campaignId: string,
     params: ListBlastTargetsParams = {},
-  ): Promise<BlastTarget[]> {
+  ): Promise<{ data: BlastTarget[]; meta: PaginationMeta }> {
     if (isMockMode()) {
       await delay(300);
-      let targets = mockBlastTargets.filter((target) => target.campaignId === campaignId);
-      if (params.platform) targets = targets.filter((target) => target.platform === params.platform);
-      if (params.status) targets = targets.filter((target) => target.status === params.status);
+      let targets = mockBlastTargets.filter(
+        (target) => target.campaignId === campaignId,
+      );
+      if (params.platform)
+        targets = targets.filter(
+          (target) => target.platform === params.platform,
+        );
+      if (params.status)
+        targets = targets.filter((target) => target.status === params.status);
       if (params.search) {
         const query = params.search.toLowerCase();
-        targets = targets.filter((target) =>
-          target.postUrl.toLowerCase().includes(query) ||
-          target.socialAccount?.username?.toLowerCase().includes(query) ||
-          target.socialAccount?.displayName?.toLowerCase().includes(query),
+        targets = targets.filter(
+          (target) =>
+            target.postUrl.toLowerCase().includes(query) ||
+            target.socialAccount?.username?.toLowerCase().includes(query) ||
+            target.socialAccount?.displayName?.toLowerCase().includes(query),
         );
       }
-      return targets.map((target) => {
+      const data = targets.map((target) => {
         const attempts = attemptsForTarget(target.id).map(withTargetRelations);
         return {
           ...target,
           latestAttempt: attempts[0],
           attempts,
           totalAttempts: attempts.length,
-          completedAttempts: attempts.filter((attempt) => attempt.status === "COMPLETED").length,
+          completedAttempts: attempts.filter(
+            (attempt) => attempt.status === "COMPLETED",
+          ).length,
         };
       });
+      return { data, meta: fallbackMeta(params, data.length) };
     }
 
     const res = await apiClient.get<unknown[]>(
@@ -135,21 +160,29 @@ export const blastApi = {
         sortOrder: params.sortOrder,
       },
     );
-    return res.data.map(toBlastTarget);
+    return {
+      data: res.data.map(toBlastTarget),
+      meta: res.meta ?? fallbackMeta(params, res.data.length),
+    };
   },
 
   async getTarget(campaignId: string, targetId: string): Promise<BlastTarget> {
     if (isMockMode()) {
       await delay(200);
-      const target = mockBlastTargets.find((item) => item.id === targetId && item.campaignId === campaignId);
-      if (!target) throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
+      const target = mockBlastTargets.find(
+        (item) => item.id === targetId && item.campaignId === campaignId,
+      );
+      if (!target)
+        throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
       const attempts = attemptsForTarget(targetId).map(withTargetRelations);
       return {
         ...target,
         attempts,
         latestAttempt: attempts[0],
         totalAttempts: attempts.length,
-        completedAttempts: attempts.filter((attempt) => attempt.status === "COMPLETED").length,
+        completedAttempts: attempts.filter(
+          (attempt) => attempt.status === "COMPLETED",
+        ).length,
       };
     }
 
@@ -210,8 +243,11 @@ export const blastApi = {
   ): Promise<BlastTarget> {
     if (isMockMode()) {
       await delay(350);
-      const idx = mockBlastTargets.findIndex((target) => target.id === targetId && target.campaignId === campaignId);
-      if (idx === -1) throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
+      const idx = mockBlastTargets.findIndex(
+        (target) => target.id === targetId && target.campaignId === campaignId,
+      );
+      if (idx === -1)
+        throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
       mockBlastTargets[idx] = {
         ...mockBlastTargets[idx],
         ...form,
@@ -234,8 +270,11 @@ export const blastApi = {
   ): Promise<BlastTarget> {
     if (isMockMode()) {
       await delay(350);
-      const idx = mockBlastTargets.findIndex((target) => target.id === targetId && target.campaignId === campaignId);
-      if (idx === -1) throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
+      const idx = mockBlastTargets.findIndex(
+        (target) => target.id === targetId && target.campaignId === campaignId,
+      );
+      if (idx === -1)
+        throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
       mockBlastTargets[idx] = {
         ...mockBlastTargets[idx],
         status,
@@ -251,13 +290,18 @@ export const blastApi = {
     return toBlastTarget(res.data);
   },
 
-  async getQueue(params: ListBlastAttemptsParams = {}): Promise<BlastAttempt[]> {
+  async getQueue(
+    params: ListBlastAttemptsParams = {},
+  ): Promise<BlastAttempt[]> {
     if (isMockMode()) {
       await delay(400);
       let attempts = mockBlastAttempts
         .filter((attempt) => attempt.status === "AVAILABLE")
         .map(withTargetRelations);
-      if (params.platform) attempts = attempts.filter((attempt) => attempt.blastTarget?.platform === params.platform);
+      if (params.platform)
+        attempts = attempts.filter(
+          (attempt) => attempt.blastTarget?.platform === params.platform,
+        );
       return attempts;
     }
 
@@ -271,11 +315,18 @@ export const blastApi = {
     return res.data.map(toBlastAttempt);
   },
 
-  async getMyKept(_userId?: string, params: ListBlastAttemptsParams = {}): Promise<BlastAttempt[]> {
+  async getMyKept(
+    _userId?: string,
+    params: ListBlastAttemptsParams = {},
+  ): Promise<BlastAttempt[]> {
     if (isMockMode()) {
       await delay(300);
       return mockBlastAttempts
-        .filter((attempt) => attempt.status === "KEPT" && (!_userId || attempt.keptBy === _userId))
+        .filter(
+          (attempt) =>
+            attempt.status === "KEPT" &&
+            (!_userId || attempt.keptBy === _userId),
+        )
         .map(withTargetRelations);
     }
 
@@ -289,7 +340,10 @@ export const blastApi = {
     return res.data.map(toBlastAttempt);
   },
 
-  async getMyCompleted(userId?: string, params: ListBlastReportsParams = {}): Promise<BlastAttempt[]> {
+  async getMyCompleted(
+    userId?: string,
+    params: ListBlastReportsParams = {},
+  ): Promise<BlastAttempt[]> {
     const reports = await blastApi.getMyReports(userId, params);
     return reports.map(reportToCompletedAttempt);
   },
@@ -300,9 +354,12 @@ export const blastApi = {
       blastApi.getMyCompleted(userId),
     ]);
     const rows = new Map<string, BlastAttempt>();
-    for (const attempt of [...kept, ...completed]) rows.set(attempt.id, attempt);
+    for (const attempt of [...kept, ...completed])
+      rows.set(attempt.id, attempt);
     return [...rows.values()].sort(
-      (a, b) => new Date(b.updatedAt || b.createdAt).getTime() - new Date(a.updatedAt || a.createdAt).getTime(),
+      (a, b) =>
+        new Date(b.updatedAt || b.createdAt).getTime() -
+        new Date(a.updatedAt || a.createdAt).getTime(),
     );
   },
 
@@ -313,13 +370,21 @@ export const blastApi = {
   ): Promise<BlastAttempt> {
     if (isMockMode()) {
       await delay(600);
-      const idx = mockBlastAttempts.findIndex((attempt) => attempt.id === attemptId);
-      if (idx === -1) throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
+      const idx = mockBlastAttempts.findIndex(
+        (attempt) => attempt.id === attemptId,
+      );
+      if (idx === -1)
+        throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
       if (mockBlastAttempts[idx].status !== "AVAILABLE") {
-        throw new ApiClientError("ATTEMPT_ALREADY_KEPT", "Blast attempt ini sudah diambil oleh buzzer lain.");
+        throw new ApiClientError(
+          "ATTEMPT_ALREADY_KEPT",
+          "Blast attempt ini sudah diambil oleh buzzer lain.",
+        );
       }
       const now = new Date();
-      const keepExpiresAt = new Date(now.getTime() + (keepDurationMinutes ?? 120) * 60 * 1000).toISOString();
+      const keepExpiresAt = new Date(
+        now.getTime() + (keepDurationMinutes ?? 120) * 60 * 1000,
+      ).toISOString();
       mockBlastAttempts[idx] = {
         ...mockBlastAttempts[idx],
         status: "KEPT",
@@ -341,8 +406,11 @@ export const blastApi = {
   async releaseAttempt(attemptId: string): Promise<BlastAttempt> {
     if (isMockMode()) {
       await delay(400);
-      const idx = mockBlastAttempts.findIndex((attempt) => attempt.id === attemptId);
-      if (idx === -1) throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
+      const idx = mockBlastAttempts.findIndex(
+        (attempt) => attempt.id === attemptId,
+      );
+      if (idx === -1)
+        throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
       mockBlastAttempts[idx] = {
         ...mockBlastAttempts[idx],
         status: "RELEASED",
@@ -352,7 +420,9 @@ export const blastApi = {
       return withTargetRelations(mockBlastAttempts[idx]);
     }
 
-    const res = await apiClient.post<unknown>(`/blast-attempts/${attemptId}/release`);
+    const res = await apiClient.post<unknown>(
+      `/blast-attempts/${attemptId}/release`,
+    );
     return toBlastAttempt(res.data);
   },
 
@@ -363,13 +433,22 @@ export const blastApi = {
   ): Promise<BlastReport> {
     if (isMockMode()) {
       await delay(700);
-      const aIdx = mockBlastAttempts.findIndex((attempt) => attempt.id === attemptId);
-      if (aIdx === -1) throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
+      const aIdx = mockBlastAttempts.findIndex(
+        (attempt) => attempt.id === attemptId,
+      );
+      if (aIdx === -1)
+        throw new ApiClientError("NOT_FOUND", "Attempt tidak ditemukan.");
       if (userId && mockBlastAttempts[aIdx].keptBy !== userId) {
-        throw new ApiClientError("ATTEMPT_NOT_OWNED", "Kamu tidak memegang attempt ini.");
+        throw new ApiClientError(
+          "ATTEMPT_NOT_OWNED",
+          "Kamu tidak memegang attempt ini.",
+        );
       }
       if (mockBlastAttempts[aIdx].status !== "KEPT") {
-        throw new ApiClientError("ATTEMPT_INVALID_STATUS", "Attempt tidak siap disubmit.");
+        throw new ApiClientError(
+          "ATTEMPT_INVALID_STATUS",
+          "Attempt tidak siap disubmit.",
+        );
       }
       const now = new Date().toISOString();
       mockBlastAttempts[aIdx] = {
@@ -390,17 +469,29 @@ export const blastApi = {
       return report;
     }
 
-    const res = await apiClient.post<unknown>(`/blast-attempts/${attemptId}/report`, form);
+    const res = await apiClient.post<unknown>(
+      `/blast-attempts/${attemptId}/report`,
+      form,
+    );
     return toBlastReport(res.data);
   },
 
-  async createReblast(campaignId: string, targetId: string): Promise<BlastAttempt> {
+  async createReblast(
+    campaignId: string,
+    targetId: string,
+  ): Promise<BlastAttempt> {
     if (isMockMode()) {
       await delay(500);
-      const target = mockBlastTargets.find((item) => item.id === targetId && item.campaignId === campaignId);
-      if (!target) throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
+      const target = mockBlastTargets.find(
+        (item) => item.id === targetId && item.campaignId === campaignId,
+      );
+      if (!target)
+        throw new ApiClientError("NOT_FOUND", "Target tidak ditemukan.");
       if (target.status !== "ACTIVE") {
-        throw new ApiClientError("REBLAST_NOT_ALLOWED", "Target harus ACTIVE untuk reblast.");
+        throw new ApiClientError(
+          "REBLAST_NOT_ALLOWED",
+          "Target harus ACTIVE untuk reblast.",
+        );
       }
       const existing = attemptsForTarget(targetId);
       const now = new Date().toISOString();
@@ -431,7 +522,10 @@ export const blastApi = {
     if (isMockMode()) {
       await delay(200);
       let attempts = attemptsForTarget(targetId).map(withTargetRelations);
-      if (params.status) attempts = attempts.filter((attempt) => attempt.status === params.status);
+      if (params.status)
+        attempts = attempts.filter(
+          (attempt) => attempt.status === params.status,
+        );
       return attempts;
     }
 
@@ -452,7 +546,8 @@ export const blastApi = {
     if (isMockMode()) {
       await delay(200);
       const report = mockBlastReports.find((item) => item.id === reportId);
-      if (!report) throw new ApiClientError("NOT_FOUND", "Report tidak ditemukan.");
+      if (!report)
+        throw new ApiClientError("NOT_FOUND", "Report tidak ditemukan.");
       return report;
     }
 
@@ -463,7 +558,7 @@ export const blastApi = {
   async listReports(
     campaignId: string,
     params: ListBlastReportsParams = {},
-  ): Promise<BlastReport[]> {
+  ): Promise<{ data: BlastReport[]; meta: PaginationMeta }> {
     if (isMockMode()) {
       await delay(300);
       const targetIds = mockBlastTargets
@@ -472,7 +567,12 @@ export const blastApi = {
       const attemptIds = mockBlastAttempts
         .filter((attempt) => targetIds.includes(attempt.blastTargetId))
         .map((attempt) => attempt.id);
-      return mockBlastReports.filter((report) => attemptIds.includes(report.blastAttemptId));
+      const rows = mockBlastReports.filter((report) =>
+        attemptIds.includes(report.blastAttemptId),
+      );
+      const meta = fallbackMeta(params, rows.length);
+      const start = (meta.page - 1) * meta.limit;
+      return { data: rows.slice(start, start + meta.limit), meta };
     }
 
     const res = await apiClient.get<unknown[]>(
@@ -488,7 +588,10 @@ export const blastApi = {
         sortOrder: params.sortOrder,
       },
     );
-    return res.data.map(toBlastReport);
+    return {
+      data: res.data.map(toBlastReport),
+      meta: res.meta ?? fallbackMeta(params, res.data.length),
+    };
   },
 
   async getMyReports(
@@ -497,7 +600,9 @@ export const blastApi = {
   ): Promise<BlastReport[]> {
     if (isMockMode()) {
       await delay(300);
-      return mockBlastReports.filter((report) => !userId || report.submittedBy === userId);
+      return mockBlastReports.filter(
+        (report) => !userId || report.submittedBy === userId,
+      );
     }
 
     const res = await apiClient.get<unknown[]>("/buzzer/my-reports", {

@@ -1,21 +1,39 @@
 'use client'
 import Link from 'next/link'
-import { Archive, Eye, ExternalLink, PauseCircle, RefreshCw } from 'lucide-react'
+import { Archive, ChevronLeft, ChevronRight, Eye, ExternalLink, PauseCircle, RefreshCw, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
 import { formatDateTime } from '@/lib/utils'
-import type { BlastTarget, BlastTargetStatus } from '@/types'
+import type { BlastTarget, BlastTargetStatus, PaginationMeta } from '@/types'
 
 interface BlastLinksTableProps {
   campaignId: string
   targets: BlastTarget[]
+  meta?: PaginationMeta
+  pageSize?: number
   isAdmin?: boolean
-  actionLoadingId?: string
+  actionLoading?: { id: string; type: 'status' | 'reblast' }
   onStatusChange?: (target: BlastTarget, status: BlastTargetStatus) => void
   onReblast?: (target: BlastTarget) => void
+  onPageChange?: (page: number) => void
+  onPageSizeChange?: (pageSize: number) => void
 }
 
-export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoadingId, onStatusChange, onReblast }: BlastLinksTableProps) {
+export function BlastLinksTable({
+  campaignId,
+  targets,
+  meta,
+  pageSize = 10,
+  isAdmin = true,
+  actionLoading,
+  onStatusChange,
+  onReblast,
+  onPageChange,
+  onPageSizeChange,
+}: BlastLinksTableProps) {
+  const showingStart = meta && meta.total > 0 ? (meta.page - 1) * meta.limit + 1 : targets.length ? 1 : 0
+  const showingEnd = meta ? Math.min(meta.page * meta.limit, meta.total) : targets.length
+
   return (
     <div className="blast-table-shell">
       <div className="blast-table-scroll">
@@ -36,11 +54,14 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
           <tbody>
             {targets.map(target => {
               const latest = target.latestAttempt
-              const completed = target.completedAttempts ?? 0
-              const total = target.totalAttempts ?? target.attempts?.length ?? 0
-              const progress = total > 0 ? Math.round((completed / total) * 100) : 0
+              const completed = target.completedAttempts
+              const total = target.totalAttempts ?? target.attempts?.length
+              const progress = typeof completed === 'number' && total && total > 0 ? Math.round((completed / total) * 100) : undefined
               const claimedBy = latest?.keptByUser?.name
               const expiry = latest?.keepExpiresAt
+              const isStatusLoading = actionLoading?.id === target.id && actionLoading.type === 'status'
+              const isReblastLoading = actionLoading?.id === target.id && actionLoading.type === 'reblast'
+              const isRowActionLoading = actionLoading?.id === target.id
 
               return (
                 <tr key={target.id}>
@@ -62,7 +83,7 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
                   </td>
                   <td>
                     <div style={{ fontWeight: 800 }}>#{latest?.attemptNo ?? '-'}</div>
-                    <div className="muted-meta">{completed} of {total} completed</div>
+                    <div className="muted-meta">{typeof completed === 'number' && typeof total === 'number' ? `${completed} of ${total} completed` : 'Attempt summary unavailable'}</div>
                   </td>
                   <td>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem', alignItems: 'flex-start' }}>
@@ -91,18 +112,22 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
                     )}
                   </td>
                   <td>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 120 }}>
-                      <div className="progress-bar" style={{ height: 7 }}>
-                        <div
-                          className="progress-fill"
-                          style={{
-                            width: `${progress}%`,
-                            background: progress >= 100 ? 'var(--status-active)' : progress >= 50 ? 'var(--cyan)' : 'var(--status-kept)',
-                          }}
-                        />
+                    {progress === undefined ? (
+                      <span className="muted-meta">-</span>
+                    ) : (
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '0.55rem', minWidth: 120 }}>
+                        <div className="progress-bar" style={{ height: 7 }}>
+                          <div
+                            className="progress-fill"
+                            style={{
+                              width: `${progress}%`,
+                              background: progress >= 100 ? 'var(--status-active)' : progress >= 50 ? 'var(--cyan)' : 'var(--status-kept)',
+                            }}
+                          />
+                        </div>
+                        <strong style={{ fontSize: '0.75rem' }}>{progress}%</strong>
                       </div>
-                      <strong style={{ fontSize: '0.75rem' }}>{progress}%</strong>
-                    </div>
+                    )}
                   </td>
                   <td>
                     <div className="action-row">
@@ -115,17 +140,28 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
                             className="icon-action warning"
                             type="button"
                             onClick={() => onReblast?.(target)}
-                            disabled={target.status !== 'ACTIVE' || actionLoadingId === target.id}
+                            disabled={target.status !== 'ACTIVE' || isRowActionLoading}
                             title={target.status === 'ACTIVE' ? 'Create reblast attempt' : 'Reblast hanya tersedia untuk target ACTIVE'}
                           >
-                            <RefreshCw size={13} /> Reblast
+                            {isReblastLoading ? <span className="spinner" /> : <RefreshCw size={13} />} Reblast
                           </button>
-                          {target.status === 'PAUSED' ? (
+                          {target.status === 'ARCHIVED' ? (
                             <Button
                               type="button"
                               variant="ghost"
                               size="sm"
-                              loading={actionLoadingId === target.id}
+                              loading={isStatusLoading}
+                              onClick={() => onStatusChange?.(target, 'ACTIVE')}
+                              className="icon-action"
+                            >
+                              <RotateCcw size={13} /> Restore
+                            </Button>
+                          ) : target.status === 'PAUSED' ? (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              loading={isStatusLoading}
                               onClick={() => onStatusChange?.(target, 'ACTIVE')}
                               className="icon-action"
                             >
@@ -136,7 +172,7 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
                               type="button"
                               variant="ghost"
                               size="sm"
-                              loading={actionLoadingId === target.id}
+                              loading={isStatusLoading}
                               disabled={target.status !== 'ACTIVE'}
                               onClick={() => onStatusChange?.(target, 'PAUSED')}
                               className="icon-action"
@@ -144,14 +180,16 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
                               <PauseCircle size={13} /> Pause
                             </Button>
                           )}
-                          <button
-                            className="icon-action danger"
-                            type="button"
-                            onClick={() => onStatusChange?.(target, 'ARCHIVED')}
-                            disabled={target.status === 'ARCHIVED' || actionLoadingId === target.id}
-                          >
-                            <Archive size={13} /> Archive
-                          </button>
+                          {target.status !== 'ARCHIVED' && (
+                            <button
+                              className="icon-action danger"
+                              type="button"
+                              onClick={() => onStatusChange?.(target, 'ARCHIVED')}
+                              disabled={isRowActionLoading}
+                            >
+                              <Archive size={13} /> Archive
+                            </button>
+                          )}
                         </>
                       )}
                     </div>
@@ -164,12 +202,20 @@ export function BlastLinksTable({ campaignId, targets, isAdmin = true, actionLoa
       </div>
 
       <div className="pagination-footer">
-        <span>Showing 1 to {targets.length} of {targets.length} blast links</span>
+        <span>Showing {showingStart} to {showingEnd} of {meta?.total ?? targets.length} blast links</span>
         <div className="pager">
-          <button type="button" aria-label="Previous page">‹</button>
-          <span>1</span>
-          <button type="button" aria-label="Next page">›</button>
-          <button type="button">10 per page</button>
+          <button type="button" aria-label="Previous page" disabled={!meta || meta.page <= 1} onClick={() => meta && onPageChange?.(Math.max(1, meta.page - 1))}>
+            <ChevronLeft size={15} />
+          </button>
+          <span>{meta ? `${meta.page} / ${Math.max(meta.totalPages, 1)}` : '1'}</span>
+          <button type="button" aria-label="Next page" disabled={!meta || meta.page >= meta.totalPages} onClick={() => meta && onPageChange?.(meta.page + 1)}>
+            <ChevronRight size={15} />
+          </button>
+          <select className="input-field" value={pageSize} onChange={event => onPageSizeChange?.(Number(event.target.value))} style={{ width: 112, padding: '0.45rem 0.6rem' }}>
+            <option value={10}>10 per page</option>
+            <option value={20}>20 per page</option>
+            <option value={50}>50 per page</option>
+          </select>
         </div>
       </div>
     </div>

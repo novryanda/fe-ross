@@ -1,13 +1,14 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Edit2, ExternalLink, Eye, Facebook, Globe, Info, Instagram, Music2, Plus, RadioTower } from 'lucide-react'
+import { Archive, Edit2, ExternalLink, Eye, Facebook, Globe, Info, Instagram, Music2, Plus, RadioTower, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataFilters } from '@/components/ui/data-filters'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { PLATFORMS, SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
@@ -32,32 +33,41 @@ export default function SocialAccountsPage() {
   const [platform, setPlatform] = useState('')
   const [status, setStatus] = useState('')
   const [category, setCategory] = useState('')
+  const [page, setPage] = useState(1)
+  const [limit, setLimit] = useState(10)
   const canLoadAccounts = isInitialized && role === 'ADMIN'
 
+  useEffect(() => {
+    setPage(1)
+  }, [search, platform, status, category])
+
   const accountsQuery = useQuery({
-    queryKey: ['social-accounts', { search, platform, status, category }],
+    queryKey: ['social-accounts', { search, platform, status, category, page, limit }],
     queryFn: () =>
       socialAccountsApi.list({
         search: search || undefined,
         platform: platform || undefined,
         status: status || undefined,
         category: category || undefined,
-        limit: 100,
+        page,
+        limit,
       }),
     enabled: canLoadAccounts,
   })
 
-  const archiveMutation = useMutation({
-    mutationFn: (id: string) => socialAccountsApi.archive(id),
-    onSuccess: () => {
-      toast.success('Social account di-archive.')
+  const statusMutation = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: SocialAccountStatus }) =>
+      socialAccountsApi.updateStatus(id, status),
+    onSuccess: (_account, variables) => {
+      toast.success(variables.status === 'ACTIVE' ? 'Social account direstore.' : 'Social account di-archive.')
       queryClient.invalidateQueries({ queryKey: ['social-accounts'] })
     },
     onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
   })
 
   const accounts = accountsQuery.data?.data ?? []
-  const total = accountsQuery.data?.meta?.total ?? accounts.length
+  const meta = accountsQuery.data?.meta
+  const total = meta?.total ?? accounts.length
 
   const kpis = [
     { label: 'Total Accounts', value: total, accent: 'var(--cyan)', icon: platformIcons.TOTAL },
@@ -205,15 +215,27 @@ export default function SocialAccountsPage() {
                         <Link href={`/network/social-accounts/${account.id}/edit`} className="icon-action" style={{ textDecoration: 'none' }}>
                           <Edit2 size={13} /> Edit
                         </Link>
-                        <button
-                          type="button"
-                          className="icon-action danger"
-                          disabled={account.status === 'ARCHIVED' || archiveMutation.isPending}
-                          onClick={() => archiveMutation.mutate(account.id)}
-                        >
-                          <Archive size={13} />
-                          {archiveMutation.isPending && archiveMutation.variables === account.id ? 'Archiving...' : 'Archive'}
-                        </button>
+                        {account.status === 'ARCHIVED' ? (
+                          <button
+                            type="button"
+                            className="icon-action"
+                            disabled={statusMutation.isPending && statusMutation.variables?.id === account.id}
+                            onClick={() => statusMutation.mutate({ id: account.id, status: 'ACTIVE' })}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.id === account.id ? <span className="spinner" /> : <RotateCcw size={13} />}
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="icon-action danger"
+                            disabled={statusMutation.isPending && statusMutation.variables?.id === account.id}
+                            onClick={() => statusMutation.mutate({ id: account.id, status: 'ARCHIVED' })}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.id === account.id ? <span className="spinner" /> : <Archive size={13} />}
+                            Archive
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -224,6 +246,16 @@ export default function SocialAccountsPage() {
               <span>Showing {accounts.length} of {total} social accounts</span>
               <span>Archive = PATCH status ARCHIVED (soft). Tidak ada DELETE di backend.</span>
             </div>
+            <PaginationControls
+              meta={meta}
+              pageSize={limit}
+              itemLabel="social accounts"
+              onPageChange={setPage}
+              onPageSizeChange={(nextLimit) => {
+                setLimit(nextLimit)
+                setPage(1)
+              }}
+            />
           </div>
         )}
       </div>

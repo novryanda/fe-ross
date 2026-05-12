@@ -42,9 +42,14 @@ export default function ExportsPage() {
   const [campaignId, setCampaignId] = useState('')
   const [format, setFormat] = useState<ExportFormat>('PDF')
   const [scope, setScope] = useState<ExportScope>('FULL')
+  const [exportDateFrom, setExportDateFrom] = useState('')
+  const [exportDateTo, setExportDateTo] = useState('')
+  const [filterCampaignId, setFilterCampaignId] = useState('')
+  const [formatFilter, setFormatFilter] = useState<ExportFormat | ''>('')
+  const [scopeFilter, setScopeFilter] = useState<ExportScope | ''>('')
   const [statusFilter, setStatusFilter] = useState<ExportStatus | ''>('')
-  const [dateFrom, setDateFrom] = useState('')
-  const [dateTo, setDateTo] = useState('')
+  const [filterDateFrom, setFilterDateFrom] = useState('')
+  const [filterDateTo, setFilterDateTo] = useState('')
 
   const { data: campaigns } = useQuery({
     queryKey: ['campaigns', { limit: 100 }],
@@ -52,14 +57,17 @@ export default function ExportsPage() {
   })
 
   const exportsQuery = useQuery({
-    queryKey: ['exports', { statusFilter, dateFrom, dateTo }],
+    queryKey: ['exports', { filterCampaignId, formatFilter, scopeFilter, statusFilter, filterDateFrom, filterDateTo }],
     queryFn: () =>
       exportsApi.list({
+        campaignId: filterCampaignId || undefined,
+        format: formatFilter || undefined,
+        scope: scopeFilter || undefined,
         status: statusFilter || undefined,
-        dateFrom: dateFrom || undefined,
-        dateTo: dateTo || undefined,
+        dateFrom: filterDateFrom || undefined,
+        dateTo: filterDateTo || undefined,
       }),
-    refetchInterval: (query) => (hasInFlightExport(query.state.data?.data) ? 5000 : false),
+    refetchInterval: (query) => (hasInFlightExport(query.state.data?.data) ? 12000 : false),
   })
 
   const exports = exportsQuery.data?.data ?? []
@@ -67,7 +75,12 @@ export default function ExportsPage() {
   const createMutation = useMutation({
     mutationFn: () => {
       if (!campaignId) throw new Error('Campaign belum dipilih.')
-      return exportsApi.create(campaignId, { format, scope })
+      return exportsApi.create(campaignId, {
+        format,
+        scope,
+        dateFrom: exportDateFrom || undefined,
+        dateTo: exportDateTo || undefined,
+      })
     },
     onSuccess: (record) => {
       toast.success(`Export ${record.format} diminta.`)
@@ -81,16 +94,19 @@ export default function ExportsPage() {
   })
 
   const retryMutation = useMutation({
-    mutationFn: (record: ExportRecord) =>
-      exportsApi.create(record.campaignId, {
-        format: record.format,
-        scope: record.scope ?? 'FULL',
-      }),
+    mutationFn: (record: ExportRecord) => exportsApi.retryExport(record.id),
     onSuccess: (record) => {
-      toast.success('Export di-retry.')
+      toast.success('Export retry started.')
       queryClient.invalidateQueries({ queryKey: ['exports'] })
       queryClient.invalidateQueries({ queryKey: ['exports', record.campaignId] })
     },
+    onError: (error) => {
+      toast.error(mapApiErrorToToastMessage(error))
+    },
+  })
+
+  const downloadMutation = useMutation({
+    mutationFn: (record: ExportRecord) => exportsApi.downloadExport(record),
     onError: (error) => {
       toast.error(mapApiErrorToToastMessage(error))
     },
@@ -124,6 +140,14 @@ export default function ExportsPage() {
               gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
             }}
           >
+            <div style={{ gridColumn: '1 / -1' }}>
+              <p style={{ margin: 0, fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                Generate report membuat snapshot sesuai scope dan rentang tanggal yang dipilih.
+              </p>
+              <p style={{ margin: '0.25rem 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+                File akan disimpan sebagai artefak export dan dapat diunduh ulang dari Export History.
+              </p>
+            </div>
             <div>
               <label className="form-label">Campaign</label>
               <select className="input-field" value={campaignId} onChange={(e) => setCampaignId(e.target.value)}>
@@ -148,6 +172,24 @@ export default function ExportsPage() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="form-label">Date From</label>
+              <input
+                type="date"
+                className="input-field"
+                value={exportDateFrom}
+                onChange={(e) => setExportDateFrom(e.target.value)}
+              />
+            </div>
+            <div>
+              <label className="form-label">Date To</label>
+              <input
+                type="date"
+                className="input-field"
+                value={exportDateTo}
+                onChange={(e) => setExportDateTo(e.target.value)}
+              />
+            </div>
             <div style={{ display: 'flex', alignItems: 'flex-end' }}>
               <Button
                 variant="primary"
@@ -167,6 +209,38 @@ export default function ExportsPage() {
           <select
             className="input-field"
             style={{ width: 'auto' }}
+            value={filterCampaignId}
+            onChange={(e) => setFilterCampaignId(e.target.value)}
+          >
+            <option value="">All Campaigns</option>
+            {campaignOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select
+            className="input-field"
+            style={{ width: 'auto' }}
+            value={formatFilter}
+            onChange={(e) => setFormatFilter(e.target.value as ExportFormat | '')}
+          >
+            <option value="">All Formats</option>
+            <option value="PDF">PDF</option>
+            <option value="EXCEL">Excel</option>
+          </select>
+          <select
+            className="input-field"
+            style={{ width: 'auto' }}
+            value={scopeFilter}
+            onChange={(e) => setScopeFilter(e.target.value as ExportScope | '')}
+          >
+            <option value="">All Scopes</option>
+            {SCOPES.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
+          <select
+            className="input-field"
+            style={{ width: 'auto' }}
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value as ExportStatus | '')}
           >
@@ -179,8 +253,8 @@ export default function ExportsPage() {
             type="date"
             className="input-field"
             style={{ width: 'auto' }}
-            value={dateFrom}
-            onChange={(e) => setDateFrom(e.target.value)}
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
             aria-label="Dari tanggal"
           />
           <span className="muted-meta" style={{ fontSize: '0.75rem' }}>→</span>
@@ -188,8 +262,8 @@ export default function ExportsPage() {
             type="date"
             className="input-field"
             style={{ width: 'auto' }}
-            value={dateTo}
-            onChange={(e) => setDateTo(e.target.value)}
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
             aria-label="Sampai tanggal"
           />
         </div>
@@ -215,8 +289,11 @@ export default function ExportsPage() {
         ) : (
           <ExportHistoryTable
             exports={exports}
+            onDownload={(record) => downloadMutation.mutate(record)}
             onRetry={isViewer ? undefined : (record) => retryMutation.mutate(record)}
+            downloadingId={downloadMutation.isPending ? downloadMutation.variables?.id ?? null : null}
             retryingId={retryMutation.isPending ? retryMutation.variables?.id ?? null : null}
+            onRefresh={() => exportsQuery.refetch()}
           />
         )}
       </div>

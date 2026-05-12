@@ -5,7 +5,14 @@
  * Real mode targets the backend endpoints documented in
  * `Backend_API_Contract_Inventory_v1.3.md` modules 10 & 11.
  */
-import type { CommentCommand, CommentCommandStatus, CommentTask, Platform, Stance } from "@/types";
+import type {
+  CommentCommand,
+  CommentCommandStatus,
+  CommentTask,
+  PaginationMeta,
+  Platform,
+  Stance,
+} from "@/types";
 import { apiClient, isMockMode } from "./client";
 import { ApiError } from "./errors";
 import { mockCommentCommands, mockCommentTasks } from "@/lib/mock-data";
@@ -46,6 +53,19 @@ export interface CommentQueueParams {
   stance?: Stance;
 }
 
+export interface ListCommentCommandsParams {
+  page?: number;
+  limit?: number;
+  sortBy?: string;
+  sortOrder?: "asc" | "desc";
+  search?: string;
+  stance?: Stance;
+  platform?: Platform;
+  status?: CommentCommandStatus;
+  dateFrom?: string;
+  dateTo?: string;
+}
+
 export interface MyCommentTasksParams {
   page?: number;
   limit?: number;
@@ -61,18 +81,77 @@ export interface CompleteCommentTaskDto {
   notes?: string;
 }
 
+function fallbackMeta(
+  params: Pick<ListCommentCommandsParams, "page" | "limit"> | undefined,
+  total: number,
+): PaginationMeta {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
+}
+
 // ---------- Commands (Admin) ----------
 
 export const commentCommandsApi = {
-  async list(campaignId: string): Promise<CommentCommand[]> {
+  async list(
+    campaignId: string,
+    params: ListCommentCommandsParams = {},
+  ): Promise<{ data: CommentCommand[]; meta: PaginationMeta }> {
     if (isMockMode()) {
       await delay(MOCK_LATENCY_MS);
-      return mockCommentCommands.filter((c) => c.campaignId === campaignId);
+      let rows = mockCommentCommands.filter((c) => c.campaignId === campaignId);
+      if (params.search) {
+        const needle = params.search.toLowerCase();
+        rows = rows.filter((command) =>
+          `${command.targetPostUrl} ${command.narrative} ${command.instruction ?? ""}`
+            .toLowerCase()
+            .includes(needle),
+        );
+      }
+      if (params.stance) rows = rows.filter((c) => c.stance === params.stance);
+      if (params.platform)
+        rows = rows.filter((c) => c.platform === params.platform);
+      if (params.status) rows = rows.filter((c) => c.status === params.status);
+      if (params.dateFrom) {
+        const from = new Date(params.dateFrom).getTime();
+        rows = rows.filter(
+          (c) => c.deadline && new Date(c.deadline).getTime() >= from,
+        );
+      }
+      if (params.dateTo) {
+        const to = new Date(params.dateTo).getTime();
+        rows = rows.filter(
+          (c) => c.deadline && new Date(c.deadline).getTime() <= to,
+        );
+      }
+      const meta = fallbackMeta(params, rows.length);
+      const start = (meta.page - 1) * meta.limit;
+      return { data: rows.slice(start, start + meta.limit), meta };
     }
     const response = await apiClient.get<unknown[]>(
       `/campaigns/${campaignId}/comment-commands`,
+      {
+        page: params.page,
+        limit: params.limit,
+        sortBy: params.sortBy,
+        sortOrder: params.sortOrder,
+        search: params.search,
+        stance: params.stance,
+        platform: params.platform,
+        status: params.status,
+        dateFrom: params.dateFrom,
+        dateTo: params.dateTo,
+      },
     );
-    return response.data.map(toCommentCommand);
+    return {
+      data: response.data.map(toCommentCommand),
+      meta: response.meta ?? fallbackMeta(params, response.data.length),
+    };
   },
 
   async get(commandId: string): Promise<CommentCommand> {
@@ -146,7 +225,8 @@ export const commentCommandsApi = {
     if (isMockMode()) {
       await delay(MOCK_LATENCY_MS);
       const idx = mockCommentCommands.findIndex((c) => c.id === commandId);
-      if (idx === -1) throw new ApiError("NOT_FOUND", "Command tidak ditemukan.");
+      if (idx === -1)
+        throw new ApiError("NOT_FOUND", "Command tidak ditemukan.");
       mockCommentCommands[idx] = {
         ...mockCommentCommands[idx],
         ...dto,
@@ -168,7 +248,8 @@ export const commentCommandsApi = {
     if (isMockMode()) {
       await delay(MOCK_LATENCY_MS);
       const idx = mockCommentCommands.findIndex((c) => c.id === commandId);
-      if (idx === -1) throw new ApiError("NOT_FOUND", "Command tidak ditemukan.");
+      if (idx === -1)
+        throw new ApiError("NOT_FOUND", "Command tidak ditemukan.");
       mockCommentCommands[idx] = {
         ...mockCommentCommands[idx],
         status,
@@ -222,15 +303,12 @@ export const commentTasksApi = {
           params.stance ? t.command?.stance === params.stance : true,
         );
     }
-    const response = await apiClient.get<unknown[]>(
-      "/buzzer/comment-queue",
-      {
-        page: params.page,
-        limit: params.limit,
-        platform: params.platform,
-        stance: params.stance,
-      },
-    );
+    const response = await apiClient.get<unknown[]>("/buzzer/comment-queue", {
+      page: params.page,
+      limit: params.limit,
+      platform: params.platform,
+      stance: params.stance,
+    });
     return response.data.map(toCommentTask);
   },
 
@@ -254,14 +332,11 @@ export const commentTasksApi = {
           command: mockCommentCommands.find((c) => c.id === t.commandId),
         }));
     }
-    const response = await apiClient.get<unknown[]>(
-      "/buzzer/comment-tasks",
-      {
-        page: params.page,
-        limit: params.limit,
-        status: params.status,
-      },
-    );
+    const response = await apiClient.get<unknown[]>("/buzzer/comment-tasks", {
+      page: params.page,
+      limit: params.limit,
+      status: params.status,
+    });
     return response.data.map(toCommentTask);
   },
 

@@ -56,30 +56,35 @@ export default function ReportsPage() {
       // No campaign selected → aggregate across accessible campaigns.
       const list = campaigns?.data ?? []
       if (!list.length) return { blastReports: [], commentProofs: [] }
-      const results = await Promise.all(
+      const results = await Promise.allSettled(
         list.map(async (campaign) => {
-          try {
-            return await reportsApi.listCampaignReports(
-              campaign.id,
-              {
-                platform: platform || undefined,
-                dateFrom: dateFrom || undefined,
-                dateTo: dateTo || undefined,
-              },
-              reportKind,
-            )
-          } catch {
-            return { blastReports: [], commentProofs: [] }
-          }
+          return reportsApi.listCampaignReports(
+            campaign.id,
+            {
+              platform: platform || undefined,
+              dateFrom: dateFrom || undefined,
+              dateTo: dateTo || undefined,
+            },
+            reportKind,
+          )
         }),
       )
-      return results.reduce(
+      const fulfilled = results.flatMap((result) =>
+        result.status === 'fulfilled' ? [result.value] : [],
+      )
+      if (!fulfilled.length) {
+        const firstFailure = results.find(
+          (result): result is PromiseRejectedResult => result.status === 'rejected',
+        )
+        if (firstFailure) throw firstFailure.reason
+      }
+      return fulfilled.reduce(
         (acc, bundle) => {
           acc.blastReports.push(...bundle.blastReports)
           acc.commentProofs.push(...bundle.commentProofs)
           return acc
         },
-        { blastReports: [], commentProofs: [] } as { blastReports: typeof results[number]['blastReports']; commentProofs: typeof results[number]['commentProofs'] },
+        { blastReports: [], commentProofs: [] } as { blastReports: typeof fulfilled[number]['blastReports']; commentProofs: typeof fulfilled[number]['commentProofs'] },
       )
     },
     enabled: !!campaigns,

@@ -117,6 +117,7 @@ function deriveDetails(
 export function toAuditLog(value: unknown): AuditLog {
   const raw = asRecord(value);
   const actor = asRecord(raw.actor);
+  const campaign = asRecord(raw.campaign);
   const entityTypeRaw = asString(raw.entityType);
 
   const actorId =
@@ -138,7 +139,8 @@ export function toAuditLog(value: unknown): AuditLog {
       asOptionalString(raw.entityId) ?? asOptionalString(raw.target) ?? "",
     targetType: normalizeEntityType(entityTypeRaw || asString(raw.targetType)),
     entityTypeRaw: asOptionalString(entityTypeRaw),
-    campaignId: asOptionalString(raw.campaignId),
+    campaignId: asOptionalString(raw.campaignId) ?? asOptionalString(campaign.id),
+    campaignName: asOptionalString(campaign.name),
     details:
       asOptionalString(raw.details) ??
       deriveDetails(

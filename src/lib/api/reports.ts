@@ -36,10 +36,22 @@ export interface ListReportsParams {
 export interface CampaignReportsBundle {
   blastReports: BlastReport[];
   commentProofs: CommentTask[];
+  meta: PaginationMeta;
+  paginationSource: "BLAST_REPORTS" | "NONE";
 }
 
-function fallbackMeta(total: number): PaginationMeta {
-  return { page: 1, limit: Math.max(total, 20), total, totalPages: 1 };
+function fallbackMeta(
+  params: Pick<ListReportsParams, "page" | "limit"> | undefined,
+  total: number,
+): PaginationMeta {
+  const page = params?.page ?? 1;
+  const limit = params?.limit ?? 20;
+  return {
+    page,
+    limit,
+    total,
+    totalPages: Math.max(1, Math.ceil(total / limit)),
+  };
 }
 
 export const reportsApi = {
@@ -67,7 +79,10 @@ export const reportsApi = {
             sortBy: params.sortBy,
             sortOrder: params.sortOrder,
           })
-        : Promise.resolve<BlastReport[]>([]),
+        : Promise.resolve<{ data: BlastReport[]; meta: PaginationMeta }>({
+            data: [],
+            meta: fallbackMeta(params, 0),
+          }),
       includeComment
         ? commentTasksApi.listByCampaign(campaignId)
         : Promise.resolve<CommentTask[]>([]),
@@ -79,7 +94,14 @@ export const reportsApi = {
         )
       : [];
 
-    return { blastReports, commentProofs: completedProofs };
+    return {
+      blastReports: blastReports.data,
+      commentProofs: completedProofs,
+      meta: includeBlast
+        ? blastReports.meta
+        : fallbackMeta(params, completedProofs.length),
+      paginationSource: includeBlast ? "BLAST_REPORTS" : "NONE",
+    };
   },
 
   /** Buzzer `my-reports` bundle. */
@@ -94,7 +116,7 @@ export const reportsApi = {
       sortBy: params.sortBy,
       sortOrder: params.sortOrder,
     });
-    return { data, meta: fallbackMeta(data.length) };
+    return { data, meta: fallbackMeta(params, data.length) };
   },
 
   async getBlastReport(reportId: string): Promise<BlastReport> {

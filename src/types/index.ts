@@ -34,11 +34,6 @@ export type CommentTaskStatus =
   | "CANCELLED";
 export type ExportFormat = "PDF" | "EXCEL";
 export type ExportStatus = "PENDING" | "PROCESSING" | "COMPLETED" | "FAILED";
-/**
- * Export scope is a FE-only grouping. Backend MVP only accepts `format` and
- * always produces a full campaign snapshot. We still carry `scope` so the UI
- * can communicate intent and future-proof the mapper.
- */
 export type ExportScope =
   | "SUMMARY"
   | "BLAST_REPORTS"
@@ -238,6 +233,7 @@ export interface AuditLog {
     | "other";
   entityTypeRaw?: string;
   campaignId?: string;
+  campaignName?: string;
   details?: string;
   oldValues?: unknown;
   newValues?: unknown;
@@ -254,11 +250,21 @@ export interface ExportRecord {
   format: ExportFormat;
   scope?: ExportScope;
   status: ExportStatus;
+  dateFrom?: string;
+  dateTo?: string;
+  fileName?: string;
+  fileUrl?: string;
   downloadUrl?: string;
   requestedBy: string;
   requestedByName?: string;
+  mimeType?: string;
+  errorMessage?: string;
+  retriedFromId?: string;
+  requestedAt?: string;
+  startedAt?: string;
   createdAt: string;
   completedAt?: string;
+  failedAt?: string;
   fileSize?: number;
 }
 

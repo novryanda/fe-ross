@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { EmptyState } from '@/components/ui/empty-state'
 import { PlatformBadge, StanceBadge, StatusBadge } from '@/components/ui/badges'
+import { PlatformSelector } from '@/components/ui/platform-selector'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { CompletionChecklistCard, SectionHeader, type ChecklistItem } from '@/components/features/campaign/enterprise-campaign-form'
 import { campaignsApi } from '@/lib/api/campaigns'
@@ -113,61 +114,10 @@ export default function NewCommandPage() {
                   <div className="field-grid-2">
                     <div className="form-group">
                       <label className="form-label">Platform <span className="required-dot">Required</span></label>
-                      <div className="platform-card-grid platform-card-grid-compact" style={{ gridTemplateColumns: 'repeat(2, 1fr)' }}>
-                        {(['INSTAGRAM', 'TIKTOK', 'X_TWITTER', 'FACEBOOK'] as Platform[]).map(item => {
-                          const selected = platform === item
-                          const brandStyles: Record<Platform, { bg: string; icon: string }> = {
-                            INSTAGRAM: { bg: 'linear-gradient(45deg, #f09433, #e6683c, #dc2743, #cc2366, #bc1888)', icon: '/instagram.svg' },
-                            TIKTOK: { bg: '#69C9D0', icon: '/tiktok.svg' },
-                            X_TWITTER: { bg: '#FFFFFF', icon: '/x.svg' },
-                            FACEBOOK: { bg: '#1877F2', icon: '/facebook.svg' }
-                          }
-                          const style = brandStyles[item]
-                          
-                          return (
-                            <button 
-                              key={item} 
-                              type="button" 
-                              className={`platform-select-card-wide ${selected ? 'selected' : ''}`} 
-                              onClick={() => { setPlatform(item); setSocialAccountId('') }}
-                              style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.75rem',
-                                padding: '0.65rem 0.85rem',
-                                background: 'rgba(255,255,255,0.02)',
-                                border: selected ? '1px solid var(--cyan)' : '1px solid var(--border-subtle)',
-                                borderRadius: '12px',
-                                width: '100%',
-                                cursor: 'pointer',
-                                transition: 'all 0.2s ease'
-                              }}
-                            >
-                              <div 
-                                style={{ 
-                                  width: 18, height: 18, 
-                                  background: style.bg,
-                                  WebkitMaskImage: `url(${style.icon})`,
-                                  maskImage: `url(${style.icon})`,
-                                  WebkitMaskRepeat: 'no-repeat',
-                                  maskRepeat: 'no-repeat',
-                                  WebkitMaskSize: 'contain',
-                                  maskSize: 'contain',
-                                  opacity: selected ? 1 : 0.6
-                                }} 
-                              />
-                              <span style={{ 
-                                color: selected ? 'var(--text-primary)' : 'var(--text-secondary)',
-                                fontWeight: 700,
-                                fontSize: '0.82rem',
-                                textTransform: 'capitalize'
-                              }}>
-                                {item.toLowerCase().replace('_', ' ')}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
+                      <PlatformSelector 
+                        value={platform} 
+                        onChange={(item) => { setPlatform(item); setSocialAccountId('') }} 
+                      />
                     </div>
                     <div className="form-group" style={{ display: 'flex', flexDirection: 'column' }}>
                       <label className="form-label">Optional Social Account / Source Account</label>
