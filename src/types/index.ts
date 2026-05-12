@@ -271,10 +271,25 @@ export interface ExportRecord {
 // --- Dashboard ---
 export interface GlobalDashboardData {
   activeCampaigns: number;
+  activeCampaignsDelta?: string | null;
+  activeCampaignsDeltaPositive?: boolean;
+
   totalViews: number;
+  totalViewsDelta?: string | null;
+  totalViewsDeltaPositive?: boolean;
+
   totalEngagement: number;
+  totalEngagementDelta?: string | null;
+  totalEngagementDeltaPositive?: boolean;
+
   completionRate: number;
+  completionRateDelta?: string | null;
+  completionRateDeltaPositive?: boolean;
+
   overdueTasks: number;
+  overdueTasksDelta?: string | null;
+  overdueTasksDeltaPositive?: boolean;
+
   expiredKeeps: number;
   activeBuzzers: number;
   engagementTrend: TrendDataPoint[];
