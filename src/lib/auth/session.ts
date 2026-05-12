@@ -1,9 +1,13 @@
 /**
  * Single source of truth for auth session cookie and route groups.
  * Keep in sync with backend (`api/src/auth/auth.ts` → `advanced.cookiePrefix`).
+ *
+ * Better Auth adds `__Secure-` prefix in production (useSecureCookies: true).
+ * The proxy must check BOTH variants.
  */
 
 export const AUTH_SESSION_COOKIE_NAME = "ross.session_token";
+export const AUTH_SESSION_COOKIE_NAME_SECURE = "__Secure-ross.session_token";
 
 export type ApiMode = "mock" | "real";
 

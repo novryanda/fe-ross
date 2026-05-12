@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from "next/server";
 import {
   AUTH_SESSION_COOKIE_NAME,
+  AUTH_SESSION_COOKIE_NAME_SECURE,
   getApiMode,
   isAuthOnlyPath,
   isProtectedPath,
@@ -26,7 +27,8 @@ export function proxy(request: NextRequest) {
   }
 
   const hasSession = Boolean(
-    request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value,
+    request.cookies.get(AUTH_SESSION_COOKIE_NAME)?.value ||
+    request.cookies.get(AUTH_SESSION_COOKIE_NAME_SECURE)?.value,
   );
 
   if (isProtectedPath(pathname) && !hasSession) {
