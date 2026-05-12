@@ -43,7 +43,7 @@ export function MetricCard({ label, value, delta, deltaPositive = true, icon, sp
       </div>
       {delta && (
         <div style={{ fontSize: '0.75rem', color: deltaPositive ? 'var(--status-available)' : 'var(--status-expired)', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
-          <span>{deltaPositive ? '↑' : '↑'}</span>
+          <span>{deltaPositive ? '↑' : '↓'}</span>
           <span>{delta}</span>
         </div>
       )}
