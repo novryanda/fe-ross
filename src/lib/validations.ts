@@ -52,8 +52,9 @@ export const createMemberSchema = z
   .object({
     name: z.string().min(2, "Nama minimal 2 karakter.").max(150),
     email: z.string().email("Format email tidak valid.").max(255),
-    role: z.enum(["ADMIN", "BUZZER", "VIEWER"]),
+    role: z.enum(["ADMIN", "BUZZER", "PIC", "VIEWER"]),
     status: z.enum(["ACTIVE", "INACTIVE"]).default("ACTIVE"),
+    picUnitId: z.string().optional(),
     campaignIds: z
       .array(z.string().uuid("Campaign ID harus UUID."))
       .max(100, "Maksimal 100 campaign sekaligus.")
@@ -73,6 +74,13 @@ export const createMemberSchema = z
         code: z.ZodIssueCode.custom,
         path: ["temporaryPassword"],
         message: "Password sementara wajib diisi ketika opsi ini aktif.",
+      });
+    }
+    if (data.role === "PIC" && !data.picUnitId) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["picUnitId"],
+        message: "PIC wajib di-assign ke unit aktif.",
       });
     }
   });

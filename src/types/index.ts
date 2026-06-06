@@ -3,7 +3,7 @@
 // ============================================
 
 // --- Enums ---
-export type UserRole = "ADMIN" | "BUZZER" | "VIEWER";
+export type UserRole = "ADMIN" | "BUZZER" | "PIC" | "VIEWER";
 export type UserStatus = "ACTIVE" | "INACTIVE";
 export type Platform = "INSTAGRAM" | "TIKTOK" | "X_TWITTER" | "FACEBOOK";
 export type CampaignStatus = "DRAFT" | "ACTIVE" | "COMPLETED" | "ARCHIVED";
@@ -39,6 +39,16 @@ export type ExportScope =
   | "BLAST_REPORTS"
   | "COMMENT_TASKS"
   | "FULL";
+export type OrgUnitStatus = "ACTIVE" | "INACTIVE";
+export type PostingOrderStatus =
+  | "PUBLISHED_TO_QUEUE"
+  | "CLAIMED"
+  | "COMPLETED"
+  | "CANCELLED";
+export type PostingSubmissionStatus =
+  | "SUBMITTED"
+  | "APPROVED_FOR_BLAST"
+  | "REJECTED";
 
 // --- User ---
 export interface User {
@@ -47,10 +57,25 @@ export interface User {
   email: string;
   role: UserRole;
   status: UserStatus;
+  picUnitId?: string | null;
   image?: string;
   createdAt: string;
   updatedAt: string;
   lastLoginAt?: string;
+}
+
+export interface OrgUnit {
+  id: string;
+  name: string;
+  code?: string;
+  status: OrgUnitStatus;
+  parentId?: string | null;
+  parent?: Pick<OrgUnit, "id" | "name" | "code" | "status">;
+  createdAt: string;
+  updatedAt: string;
+  memberCount?: number;
+  childCount?: number;
+  postingOrderCount?: number;
 }
 
 // --- Campaign ---
@@ -93,6 +118,7 @@ export interface SocialAccount {
   category: SocialAccountCategory;
   status: SocialAccountStatus;
   createdBy: string;
+  createdByUser?: User;
   createdAt: string;
   updatedAt: string;
   blastTargetCount?: number;
@@ -111,8 +137,9 @@ export interface BlastTarget {
   internalNotes?: string;
   status: BlastTargetStatus;
   submittedBy: string;
-  sourceType?: "ADMIN_SUBMITTED" | "BUZZER_SUGGESTED";
+  sourceType?: "ADMIN_SUBMITTED" | "BUZZER_SUGGESTED" | "PIC_SUBMISSION";
   reviewStatus?: "APPROVED" | "PENDING" | "REJECTED";
+  sourcePostingSubmissionId?: string;
   createdAt: string;
   updatedAt: string;
   // computed
@@ -266,6 +293,51 @@ export interface ExportRecord {
   completedAt?: string;
   failedAt?: string;
   fileSize?: number;
+}
+
+export interface PostingOrder {
+  id: string;
+  campaignId: string;
+  campaign?: Pick<Campaign, "id" | "name" | "status">;
+  targetUnitId: string;
+  targetUnit?: OrgUnit;
+  platform: Platform;
+  contentDriveUrl: string;
+  scheduledAt: string;
+  caption?: string;
+  description?: string;
+  status: PostingOrderStatus;
+  createdById: string;
+  createdByUser?: User;
+  claimedById?: string | null;
+  claimedByUser?: User;
+  claimedAt?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  submission?: PostingSubmission;
+}
+
+export interface PostingSubmission {
+  id: string;
+  postingOrderId: string;
+  postingOrder?: PostingOrder;
+  submittedById: string;
+  submittedByUser?: User;
+  socialAccountId: string;
+  socialAccount?: SocialAccount;
+  postedUrl: string;
+  proofDriveUrl: string;
+  notes?: string;
+  status: PostingSubmissionStatus;
+  reviewNotes?: string;
+  reviewedById?: string | null;
+  reviewedByUser?: User;
+  reviewedAt?: string;
+  submittedAt: string;
+  createdAt: string;
+  updatedAt: string;
+  blastTargetId?: string;
 }
 
 // --- Dashboard ---

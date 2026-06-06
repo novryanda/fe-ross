@@ -226,7 +226,7 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
           icon={<Clock3 size={48} />}
           title="Belum ada blast link yang cocok"
           description="Blast link terbuka untuk semua Buzzer yang menjadi member campaign. Tambahkan target post pertama atau ubah filter."
-          action={isAdmin ? <Link href={`/campaigns/${campaignId}/blast-links/new`} className="btn-primary" style={{ textDecoration: 'none' }}>Add Blast Link</Link> : undefined}
+          action={isAdmin ? <Link href={`/campaigns/${campaignId}/blast-links/new`} className="btn-primary" style={{ textDecoration: 'none' }}>Create From PIC Submission</Link> : undefined}
         />
       ) : (
         <BlastLinksTable

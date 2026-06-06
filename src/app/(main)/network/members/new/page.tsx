@@ -12,6 +12,7 @@ import { RoleBadge } from '@/components/layout/role-badge'
 import { StatusBadge } from '@/components/ui/badges'
 import { usersApi, type CreateUserDto } from '@/lib/api/users'
 import { campaignsApi } from '@/lib/api/campaigns'
+import { orgUnitsApi } from '@/lib/api/org-units'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { createMemberSchema } from '@/lib/validations'
 import { useAuth } from '@/hooks/use-auth'
@@ -20,6 +21,7 @@ import type { UserRole, UserStatus } from '@/types'
 const rolePermissions: Record<UserRole, string[]> = {
   ADMIN: ['Manage campaigns', 'Manage social accounts', 'Manage members', 'View reports/audit'],
   BUZZER: ['View blast/comment queue', 'Keep tasks', 'Submit reports/proof'],
+  PIC: ['View posting bank queue', 'Manage own social accounts', 'Submit posting result/proof'],
   VIEWER: ['Read-only dashboard/reports/exports'],
 }
 
@@ -33,6 +35,7 @@ export default function NewMemberPage() {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<UserRole>('BUZZER')
   const [status, setStatus] = useState<UserStatus>('ACTIVE')
+  const [picUnitId, setPicUnitId] = useState('')
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([])
   const [setTemporaryPasswordOn, setSetTemporaryPasswordOn] = useState(false)
   const [temporaryPassword, setTemporaryPassword] = useState('')
@@ -42,6 +45,11 @@ export default function NewMemberPage() {
   const campaignsQuery = useQuery({
     queryKey: ['campaigns', 'create-member-picker'],
     queryFn: () => campaignsApi.list({ limit: 100, sortBy: 'createdAt', sortOrder: 'desc' }),
+    enabled: canLoadCampaigns,
+  })
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units', 'create-member-picker'],
+    queryFn: () => orgUnitsApi.list({ limit: 100, status: 'ACTIVE' }),
     enabled: canLoadCampaigns,
   })
 
@@ -67,7 +75,8 @@ export default function NewMemberPage() {
       email: email.trim(),
       role,
       status,
-      campaignIds: selectedCampaigns.length ? selectedCampaigns : undefined,
+      campaignIds: role === 'PIC' ? undefined : selectedCampaigns.length ? selectedCampaigns : undefined,
+      picUnitId: role === 'PIC' ? picUnitId || undefined : undefined,
       setTemporaryPassword: setTemporaryPasswordOn,
       temporaryPassword: setTemporaryPasswordOn ? temporaryPassword : undefined,
       requirePasswordChange,
@@ -80,7 +89,7 @@ export default function NewMemberPage() {
       ok: false as const,
       issues: parsed.error.issues.map((issue) => issue.message),
     }
-  }, [fullName, email, role, status, selectedCampaigns, setTemporaryPasswordOn, temporaryPassword, requirePasswordChange, notes])
+  }, [fullName, email, role, status, picUnitId, selectedCampaigns, setTemporaryPasswordOn, temporaryPassword, requirePasswordChange, notes])
 
   const checklist = [
     { label: 'Full name (min 2 karakter)', ready: fullName.trim().length >= 2 },
@@ -108,6 +117,7 @@ export default function NewMemberPage() {
       role: parsed.role,
       status: parsed.status,
     }
+    if (parsed.picUnitId) payload.picUnitId = parsed.picUnitId
     if (parsed.campaignIds?.length) payload.campaignIds = parsed.campaignIds
     if (parsed.setTemporaryPassword && parsed.temporaryPassword) {
       payload.temporaryPassword = parsed.temporaryPassword
@@ -118,6 +128,8 @@ export default function NewMemberPage() {
   }
 
   const campaigns = campaignsQuery.data?.data ?? []
+  const orgUnits = orgUnitsQuery.data?.data ?? []
+  const requiresPicUnit = role === 'PIC'
 
   return (
     <RoleGuard roles={['ADMIN']}>
@@ -163,10 +175,16 @@ export default function NewMemberPage() {
                 <Select
                   label="Role"
                   value={role}
-                  onChange={(event) => setRole(event.target.value as UserRole)}
+                  onChange={(event) => {
+                    const nextRole = event.target.value as UserRole
+                    setRole(nextRole)
+                    if (nextRole !== 'PIC') setPicUnitId('')
+                    if (nextRole === 'PIC') setSelectedCampaigns([])
+                  }}
                   options={[
                     { value: 'ADMIN', label: 'ADMIN' },
                     { value: 'BUZZER', label: 'BUZZER' },
+                    { value: 'PIC', label: 'PIC' },
                     { value: 'VIEWER', label: 'VIEWER' },
                   ]}
                   disabled={createMutation.isPending}
@@ -182,14 +200,33 @@ export default function NewMemberPage() {
                   disabled={createMutation.isPending}
                 />
               </div>
+              {requiresPicUnit && (
+                <div style={{ marginTop: '1rem' }}>
+                  <Select
+                    label="PIC Unit"
+                    value={picUnitId}
+                    onChange={(event) => setPicUnitId(event.target.value)}
+                    options={orgUnits.map((unit) => ({
+                      value: unit.id,
+                      label: unit.parent ? `${unit.parent.name} / ${unit.name}` : unit.name,
+                    }))}
+                    error={!picUnitId ? 'PIC wajib di-assign ke unit aktif.' : undefined}
+                    disabled={createMutation.isPending || orgUnitsQuery.isLoading}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="form-section">
               <div className="form-section-title"><span className="step-number">2</span> Access & Campaigns</div>
               <p className="section-helper-text">
-                Untuk Buzzer, campaign membership memberikan akses queue/task. Untuk Viewer, akses campaign hanya read-only.
+                Untuk Buzzer, campaign membership memberikan akses queue/task. Untuk Viewer, akses campaign hanya read-only. PIC memakai assignment unit organisasi, bukan membership campaign.
               </p>
-              {campaignsQuery.isLoading ? (
+              {role === 'PIC' ? (
+                <div className="preview-card" style={{ color: 'var(--text-secondary)' }}>
+                  Role PIC tidak perlu assignment campaign di form ini. Queue PIC ditentukan dari unit organisasi target pada posting order.
+                </div>
+              ) : campaignsQuery.isLoading ? (
                 <div className="skeleton" style={{ height: 56, borderRadius: 10 }} />
               ) : !campaigns.length ? (
                 <div className="preview-card" style={{ color: 'var(--text-muted)' }}>

@@ -42,11 +42,13 @@ export const ATTEMPT_STATUSES: BlastAttemptStatus[] = [
 export const ROLE_LABELS: Record<UserRole, string> = {
   ADMIN: "Admin",
   BUZZER: "Buzzer",
+  PIC: "PIC",
   VIEWER: "Viewer",
 };
 export const ROLE_COLORS: Record<UserRole, string> = {
   ADMIN: "var(--violet)",
   BUZZER: "var(--cyan)",
+  PIC: "var(--status-expired)",
   VIEWER: "var(--status-kept)",
 };
 
@@ -68,6 +70,7 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   USER_UPDATED: "User Updated",
   USER_STATUS_CHANGED: "User Status Changed",
   USER_PASSWORD_RESET_REQUESTED: "Password Reset Requested",
+  USER_PIC_UNIT_ASSIGNED: "PIC Unit Assigned",
   PROFILE_UPDATED: "Profile Updated",
   PASSWORD_CHANGED: "Password Changed",
   // Campaign
@@ -91,6 +94,8 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   BLAST_ATTEMPT_EXPIRED: "Blast Attempt Expired",
   BLAST_ATTEMPT_CANCELLED: "Blast Attempt Cancelled",
   BLAST_REPORT_SUBMITTED: "Blast Report Submitted",
+  BLAST_TARGET_CREATED_FROM_PIC_SUBMISSION:
+    "Blast Target Created From PIC Submission",
   // Comment
   COMMENT_COMMAND_CREATED: "Comment Command Created",
   COMMENT_COMMAND_UPDATED: "Comment Command Updated",
@@ -104,6 +109,14 @@ export const AUDIT_ACTION_LABELS: Record<string, string> = {
   COMMENT_TASK_REJECTED: "Comment Task Rejected",
   COMMENT_TASK_BLOCKED: "Comment Task Blocked",
   COMMENT_TASK_EXPIRED: "Comment Task Expired",
+  ORG_UNIT_CREATED: "Org Unit Created",
+  ORG_UNIT_UPDATED: "Org Unit Updated",
+  POSTING_ORDER_CREATED: "Posting Order Created",
+  POSTING_ORDER_UPDATED: "Posting Order Updated",
+  POSTING_ORDER_CLAIMED: "Posting Order Claimed",
+  POSTING_ORDER_RELEASED: "Posting Order Released",
+  POSTING_ORDER_SUBMITTED: "Posting Order Submitted",
+  POSTING_SUBMISSION_STATUS_UPDATED: "Posting Submission Status Updated",
   // Export
   EXPORT_REQUESTED: "Export Requested",
   EXPORT_GENERATED: "Export Generated",

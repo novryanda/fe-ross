@@ -2,7 +2,7 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { MessageCircle, Settings, Target } from "lucide-react";
+import { FolderKanban, MessageCircle, Settings, Target } from "lucide-react";
 import { CampaignHero } from "@/components/features/campaign/campaign-hero";
 import { useAuth } from "@/hooks/use-auth";
 import { campaignMembersApi } from "@/lib/api/campaign-members";
@@ -41,7 +41,7 @@ export function CampaignShell({
         className="btn-primary"
         style={{ textDecoration: "none" }}
       >
-        <Target size={14} /> Add Blast Link
+        <Target size={14} /> Create Blast From PIC
       </Link>
       <Link
         href={`/campaigns/${campaignId}/commands/new`}
@@ -49,6 +49,13 @@ export function CampaignShell({
         style={{ textDecoration: "none" }}
       >
         <MessageCircle size={14} /> New Command
+      </Link>
+      <Link
+        href={`/campaigns/${campaignId}/posting-bank`}
+        className="btn-secondary"
+        style={{ textDecoration: "none" }}
+      >
+        <FolderKanban size={14} /> Posting Bank
       </Link>
       <Link
         href={`/campaigns/${campaignId}/edit`}

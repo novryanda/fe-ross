@@ -124,6 +124,7 @@ function asUser(raw: unknown): User | undefined {
     role:
       value.role === "ADMIN" ||
       value.role === "BUZZER" ||
+      value.role === "PIC" ||
       value.role === "VIEWER"
         ? value.role
         : "VIEWER",

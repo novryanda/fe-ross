@@ -9,14 +9,15 @@ import { campaignMembersApi } from '@/lib/api/campaign-members'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { usersApi } from '@/lib/api/users'
 import { toast } from 'sonner'
-import type { UserRole } from '@/types'
 
 function toSelectableMembers(users: Awaited<ReturnType<typeof usersApi.list>> | undefined): MockMember[] {
-  return (users?.items ?? []).map(user => ({
-    id: user.id,
-    name: user.name,
-    role: user.role as UserRole,
-  }))
+  return (users?.items ?? [])
+    .filter((user) => user.role !== 'PIC')
+    .map(user => ({
+      id: user.id,
+      name: user.name,
+      role: user.role as MockMember['role'],
+    }))
 }
 
 export default function NewCampaignPage() {

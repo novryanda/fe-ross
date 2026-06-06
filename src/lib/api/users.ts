@@ -5,7 +5,7 @@
  * without a backend. Real mode hits the NestJS endpoints documented in
  * `Backend_API_Contract_Inventory_v1.3.md` (module 2).
  */
-import type { User, UserRole, UserStatus } from "@/types";
+import type { OrgUnit, User, UserRole, UserStatus } from "@/types";
 import { apiClient, isMockMode } from "./client";
 import { ApiError } from "./errors";
 import type {
@@ -54,6 +54,7 @@ export interface CreateUserDto {
   email: string;
   role: UserRole;
   status?: UserStatus;
+  picUnitId?: string;
   campaignIds?: string[];
   temporaryPassword?: string;
   requirePasswordChange?: boolean;
@@ -65,6 +66,7 @@ export interface UpdateUserDto {
   email?: string;
   role?: UserRole;
   status?: UserStatus;
+  picUnitId?: string;
 }
 
 export interface UpdateUserStatusDto {
@@ -91,6 +93,7 @@ export interface UserMembershipView {
 }
 
 export interface UserDetail extends UserSummary {
+  picUnit?: Pick<OrgUnit, "id" | "name" | "code" | "status" | "parentId">;
   campaignMemberships: UserMembershipView[];
 }
 
@@ -181,12 +184,14 @@ export const usersApi = {
         });
       return {
         ...toUserSummary(user, memberships.length),
+        picUnit: undefined,
         campaignMemberships: memberships,
       };
     }
 
     const response = await apiClient.get<
       UserSummary & {
+        picUnit?: Pick<OrgUnit, "id" | "name" | "code" | "status" | "parentId">;
         campaignMemberships?: Array<{
           id: string;
           memberRole: UserMembershipView["memberRole"];
@@ -198,6 +203,7 @@ export const usersApi = {
     const memberships = response.data.campaignMemberships ?? [];
     return {
       ...response.data,
+      picUnit: response.data.picUnit,
       campaignMemberships: memberships,
     };
   },

@@ -63,6 +63,7 @@ export default function NetworkMembersPage() {
     { label: 'Total Members', value: total, accent: 'var(--cyan)', icon: <Users size={20} /> },
     { label: 'Admins', value: users.filter((u) => u.role === 'ADMIN').length, accent: 'var(--violet)', icon: <Shield size={20} /> },
     { label: 'Buzzers', value: users.filter((u) => u.role === 'BUZZER').length, accent: 'var(--cyan)', icon: <UserCheck size={20} /> },
+    { label: 'PICs', value: users.filter((u) => u.role === 'PIC').length, accent: 'var(--status-expired)', icon: <UserCheck size={20} /> },
     { label: 'Viewers', value: users.filter((u) => u.role === 'VIEWER').length, accent: 'var(--status-kept)', icon: <Eye size={20} /> },
     { label: 'Inactive Users', value: users.filter((u) => u.status === 'INACTIVE').length, accent: 'var(--status-expired)', icon: <UserMinus size={20} /> },
   ]
@@ -108,6 +109,7 @@ export default function NetworkMembersPage() {
               options: [
                 { value: 'ADMIN', label: 'Admin' },
                 { value: 'BUZZER', label: 'Buzzer' },
+                { value: 'PIC', label: 'PIC' },
                 { value: 'VIEWER', label: 'Viewer' },
               ],
               onChange: setRoleFilter,

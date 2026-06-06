@@ -13,6 +13,9 @@ import type {
   CommentCommand as UiCommentCommand,
   CommentTask as UiCommentTask,
   ExportRecord as UiExportRecord,
+  OrgUnit as UiOrgUnit,
+  PostingOrder as UiPostingOrder,
+  PostingSubmission as UiPostingSubmission,
   SocialAccount as UiSocialAccount,
   User as UiUser,
   UserRole,
@@ -65,6 +68,9 @@ export type SocialAccount = UiSocialAccount;
 export type BlastTarget = UiBlastTarget;
 export type BlastAttempt = UiBlastAttempt;
 export type BlastReport = UiBlastReport;
+export type OrgUnit = UiOrgUnit;
+export type PostingOrder = UiPostingOrder;
+export type PostingSubmission = UiPostingSubmission;
 export type CommentCommand = UiCommentCommand;
 export type CommentTask = UiCommentTask;
 export type AuditLog = UiAuditLog;
@@ -79,6 +85,7 @@ export interface UserSummary {
   image?: string | null;
   role: UserRole;
   status: UserStatus;
+  picUnitId?: string | null;
   lastLoginAt?: string | null;
   createdAt: string;
   updatedAt: string;

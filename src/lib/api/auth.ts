@@ -56,6 +56,7 @@ interface MeEnvelopeData {
   email: string;
   role: User["role"];
   status: User["status"];
+  picUnitId: string | null;
   lastLoginAt: string | null;
 }
 
@@ -66,6 +67,7 @@ function toUiUser(data: MeEnvelopeData): User {
     email: data.email,
     role: data.role,
     status: data.status,
+    picUnitId: data.picUnitId,
     lastLoginAt: data.lastLoginAt ?? undefined,
     // `createdAt` / `updatedAt` are not returned by /auth/me; backfill now so
     // the UI doesn't explode on `formatDate(user.createdAt)`.

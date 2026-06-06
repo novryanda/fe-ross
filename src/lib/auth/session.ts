@@ -29,11 +29,13 @@ export const PROTECTED_ROUTE_PREFIXES: readonly string[] = [
   "/audit",
   "/profile",
   "/settings",
+  "/posting-bank",
   "/blast-queue",
   "/blast-attempts",
   "/my-blasts",
   "/comment-tasks",
   "/my-reports",
+  "/pic",
 ];
 
 /**

@@ -51,6 +51,7 @@ export default function NetworkPage() {
 
   const members = membersTotalsQuery.data?.items ?? []
   const activeBuzzers = members.filter((user) => user.role === 'BUZZER' && user.status === 'ACTIVE').length
+  const activePics = members.filter((user) => user.role === 'PIC' && user.status === 'ACTIVE').length
   const viewers = members.filter((user) => user.role === 'VIEWER').length
 
   const loading =
@@ -73,8 +74,8 @@ export default function NetworkPage() {
           subtitle="Kelola akun sumber postingan dan user internal."
           actions={
             <>
-              <Link href="/network/social-accounts/new" className="btn-secondary" style={{ textDecoration: 'none' }}>
-                Add Social Account
+              <Link href="/network/social-accounts" className="btn-secondary" style={{ textDecoration: 'none' }}>
+                Open Social Accounts
               </Link>
               <Link href="/network/members/new" className="btn-primary" style={{ textDecoration: 'none' }}>
                 Add Member
@@ -133,6 +134,13 @@ export default function NetworkPage() {
                   <div className="kpi-v2-value">{loading ? '—' : activeBuzzers}</div>
                 </div>
               </div>
+              <div className="kpi-v2" style={{ borderLeftColor: 'var(--status-expired)' }}>
+                <div className="kpi-v2-icon" style={{ background: 'color-mix(in srgb, var(--status-expired) 12%, transparent)', color: 'var(--status-expired)' }}><UserCheck size={20} /></div>
+                <div>
+                  <div className="kpi-v2-label">Active PICs</div>
+                  <div className="kpi-v2-value">{loading ? '—' : activePics}</div>
+                </div>
+              </div>
               <div className="kpi-v2" style={{ borderLeftColor: 'var(--status-kept)' }}>
                 <div className="kpi-v2-icon" style={{ background: 'var(--status-kept-bg)', color: 'var(--status-kept)' }}><Eye size={20} /></div>
                 <div>
@@ -145,7 +153,7 @@ export default function NetworkPage() {
             <div className="info-banner info-banner-cyan">
               <RadioTower size={18} style={{ color: 'var(--cyan)', flexShrink: 0, marginTop: 2 }} />
               <div>
-                <strong>Domain guard:</strong> Social Account adalah akun sumber postingan yang dikelola Admin, bukan akun milik Buzzer. Members adalah akun login sistem dengan role ADMIN, BUZZER, atau VIEWER.
+                <strong>Domain guard:</strong> Social Account admin tetap akun sumber postingan untuk blast/comment lama. PIC punya daftar akun sosmed sendiri untuk submit hasil posting bank konten. Members adalah akun login sistem dengan role ADMIN, BUZZER, PIC, atau VIEWER.
               </div>
             </div>
 

@@ -39,7 +39,10 @@ export default function CampaignMembersPage() {
   const members = membersQuery.data?.data ?? [];
   const existingUserIds = new Set(members.map((member) => member.userId));
   const selectableUsers = (usersQuery.data?.items ?? []).filter(
-    (user) => user.status === "ACTIVE" && !existingUserIds.has(user.id),
+    (user) =>
+      user.status === "ACTIVE" &&
+      user.role !== "PIC" &&
+      !existingUserIds.has(user.id),
   );
   const selectedUser = selectableUsers.find(
     (user) => user.id === selectedUserId,
@@ -48,6 +51,9 @@ export default function CampaignMembersPage() {
   const addMutation = useMutation({
     mutationFn: () => {
       if (!selectedUser) throw new Error("Pilih user aktif terlebih dahulu.");
+      if (selectedUser.role === "PIC") {
+        throw new Error("Role PIC tidak bisa menjadi campaign member.");
+      }
       return campaignMembersApi.add(campaignId, {
         members: [
           {

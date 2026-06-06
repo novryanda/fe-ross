@@ -18,6 +18,7 @@ import {
   type AdminResetPasswordDto,
   type UserDetail,
 } from '@/lib/api/users'
+import { orgUnitsApi } from '@/lib/api/org-units'
 import { mapApiErrorToToastMessage, isApiError } from '@/lib/api/errors'
 import { formatDate, formatDateTime } from '@/lib/utils'
 import type { UserRole, UserStatus } from '@/types'
@@ -81,9 +82,14 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
     queryKey: ['users', 'activity', memberId],
     queryFn: () => usersApi.getActivitySummary(memberId),
   })
+  const orgUnitsQuery = useQuery({
+    queryKey: ['org-units', 'member-detail'],
+    queryFn: () => orgUnitsApi.list({ limit: 100, status: 'ACTIVE' }),
+  })
 
   const [roleDraft, setRoleDraft] = useState<UserRole>(user.role)
   const [statusDraft, setStatusDraft] = useState<UserStatus>(user.status)
+  const [picUnitIdDraft, setPicUnitIdDraft] = useState(user.picUnit?.id ?? '')
 
   const [resetOpen, setResetOpen] = useState(false)
   const [resetPassword, setResetPassword] = useState('')
@@ -91,7 +97,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
   const [resetRequireChange, setResetRequireChange] = useState(true)
 
   const updateMutation = useMutation({
-    mutationFn: (payload: { role?: UserRole; status?: UserStatus }) =>
+    mutationFn: (payload: { role?: UserRole; status?: UserStatus; picUnitId?: string }) =>
       usersApi.update(memberId, payload),
     onSuccess: async () => {
       toast.success('Role/status diperbarui.')
@@ -133,16 +139,19 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
 
   const roleChanged = roleDraft !== user.role
   const statusChanged = statusDraft !== user.status
-  const hasEdit = roleChanged || statusChanged
+  const picUnitChanged = (picUnitIdDraft || '') !== (user.picUnit?.id ?? '')
+  const hasEdit = roleChanged || statusChanged || picUnitChanged
   const saveDisabled = !hasEdit || updateMutation.isPending
 
   const canResetSubmit = resetPassword.length >= 8 && !resetMutation.isPending
 
   const handleSaveRoleStatus = () => {
     if (!hasEdit) return
-    const payload: { role?: UserRole; status?: UserStatus } = {}
+    const payload: { role?: UserRole; status?: UserStatus; picUnitId?: string } = {}
     if (roleChanged) payload.role = roleDraft
     if (statusChanged) payload.status = statusDraft
+    if (roleDraft === 'PIC') payload.picUnitId = picUnitIdDraft || undefined
+    if (roleDraft !== 'PIC' && user.picUnit?.id) payload.picUnitId = ''
     updateMutation.mutate(payload)
   }
 
@@ -219,6 +228,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
               <div className="summary-line"><div className="summary-label">User ID</div><div className="summary-value">{user.id}</div></div>
               <div className="summary-line"><div className="summary-label">Joined</div><div className="summary-value">{formatDate(user.createdAt)}</div></div>
               <div className="summary-line"><div className="summary-label">Last Login</div><div className="summary-value">{user.lastLoginAt ? formatDateTime(user.lastLoginAt) : '-'}</div></div>
+              <div className="summary-line"><div className="summary-label">PIC Unit</div><div className="summary-value">{user.picUnit?.name ?? '-'}</div></div>
             </div>
 
             <div className="form-section">
@@ -227,10 +237,15 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
                 <Select
                   label="Role"
                   value={roleDraft}
-                  onChange={(event) => setRoleDraft(event.target.value as UserRole)}
+                  onChange={(event) => {
+                    const nextRole = event.target.value as UserRole
+                    setRoleDraft(nextRole)
+                    if (nextRole !== 'PIC') setPicUnitIdDraft('')
+                  }}
                   options={[
                     { value: 'ADMIN', label: 'ADMIN' },
                     { value: 'BUZZER', label: 'BUZZER' },
+                    { value: 'PIC', label: 'PIC' },
                     { value: 'VIEWER', label: 'VIEWER' },
                   ]}
                   disabled={updateMutation.isPending}
@@ -246,6 +261,21 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
                   disabled={updateMutation.isPending || isSelf}
                 />
               </div>
+              {roleDraft === 'PIC' && (
+                <div style={{ marginTop: '1rem' }}>
+                  <Select
+                    label="PIC Unit"
+                    value={picUnitIdDraft}
+                    onChange={(event) => setPicUnitIdDraft(event.target.value)}
+                    options={(orgUnitsQuery.data?.data ?? []).map((unit) => ({
+                      value: unit.id,
+                      label: unit.parent ? `${unit.parent.name} / ${unit.name}` : unit.name,
+                    }))}
+                    error={!picUnitIdDraft ? 'PIC wajib punya unit aktif.' : undefined}
+                    disabled={updateMutation.isPending || orgUnitsQuery.isLoading}
+                  />
+                </div>
+              )}
               {isSelf && statusDraft === 'INACTIVE' && (
                 <div className="blast-info-banner" style={{ marginTop: '0.75rem', borderColor: 'rgba(239,68,68,0.35)' }}>
                   <AlertCircle size={16} style={{ color: 'var(--status-expired)', flexShrink: 0 }} />
@@ -323,6 +353,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
                 <p style={{ color: 'var(--text-secondary)', fontSize: '0.82rem', marginTop: '0.75rem' }}>
                   {user.role === 'ADMIN' && 'Can manage campaigns, social accounts, members, reports, exports, dan audit views.'}
                   {user.role === 'BUZZER' && 'Can view queues, keep assigned work, dan submit proof reports.'}
+                  {user.role === 'PIC' && 'Can claim posting orders, manage own social accounts, dan submit posting result/proof.'}
                   {user.role === 'VIEWER' && 'Can read dashboard, reports, dan exports tanpa write access.'}
                 </p>
               </div>

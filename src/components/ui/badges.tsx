@@ -117,6 +117,9 @@ export function RoleBadge({ role, size = 'md' }: { role: string; size?: 'sm' | '
   } else if (role === 'BUZZER') {
     color = '#8b5cf6'
     bg = 'rgba(139, 92, 246, 0.1)'
+  } else if (role === 'PIC') {
+    color = 'var(--status-expired)'
+    bg = 'color-mix(in srgb, var(--status-expired) 15%, transparent)'
   } else if (role === 'VIEWER') {
     color = '#39ff14'
     bg = 'rgba(57, 255, 20, 0.1)'

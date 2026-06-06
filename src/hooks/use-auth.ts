@@ -127,9 +127,10 @@ export function useAuth() {
     isAuthenticated: Boolean(user),
     isAdmin: role === "ADMIN",
     isBuzzer: role === "BUZZER",
+    isPic: role === "PIC",
     isViewer: role === "VIEWER",
     hasRole: (target: UserRole) => role === target,
-    canWrite: role === "ADMIN" || role === "BUZZER",
+    canWrite: role === "ADMIN" || role === "BUZZER" || role === "PIC",
     canManage: role === "ADMIN",
     // actions
     login,

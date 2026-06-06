@@ -22,10 +22,12 @@ interface NavItem {
 }
 
 const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'BUZZER', 'VIEWER'] },
+  { label: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'BUZZER', 'PIC', 'VIEWER'] },
   // Admin + Viewer share campaign browsing
   { label: 'Campaigns', href: '/campaigns', icon: Megaphone, roles: ['ADMIN', 'VIEWER'] },
+  { label: 'Posting Bank', href: '/posting-bank', icon: CheckSquare, roles: ['ADMIN'] },
   { label: 'Network', href: '/network', icon: Network, roles: ['ADMIN'] },
+  { label: 'PIC Structure', href: '/network/pic-structure', icon: Shield, roles: ['ADMIN'] },
   { label: 'Reports', href: '/reports', icon: FileText, roles: ['ADMIN', 'VIEWER'] },
   { label: 'Exports', href: '/exports', icon: Download, roles: ['ADMIN', 'VIEWER'] },
   { label: 'Audit', href: '/audit', icon: Shield, roles: ['ADMIN'] },
@@ -34,11 +36,16 @@ const NAV_ITEMS: NavItem[] = [
   { label: 'My Blasts', href: '/my-blasts', icon: CheckSquare, roles: ['BUZZER'] },
   { label: 'Comment Tasks', href: '/comment-tasks', icon: MessageSquare, roles: ['BUZZER'] },
   { label: 'My Reports', href: '/my-reports', icon: FileText, roles: ['BUZZER'] },
+  // PIC-specific
+  { label: 'Posting Queue', href: '/pic/posting-queue', icon: Globe, roles: ['PIC'] },
+  { label: 'My Submissions', href: '/pic/my-submissions', icon: FileText, roles: ['PIC'] },
+  { label: 'My Social Accounts', href: '/pic/social-accounts', icon: User, roles: ['PIC'] },
 ]
 
 const ROLE_COLORS: Record<UserRole, string> = {
   ADMIN: 'var(--violet)',
   BUZZER: 'var(--cyan)',
+  PIC: 'var(--status-expired)',
   VIEWER: 'var(--status-kept)',
 }
 

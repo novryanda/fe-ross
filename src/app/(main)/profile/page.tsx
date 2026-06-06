@@ -17,6 +17,7 @@ import type { User as UiUser } from '@/types'
 const roleCopy = {
   ADMIN: 'Akses admin untuk mengelola campaign, social accounts, members, reports, exports, dan audit.',
   BUZZER: 'Akses queue untuk mengambil blast/comment tasks, keep pekerjaan, dan submit proof/report.',
+  PIC: 'Akses queue bank postingan, kelola daftar akun sosmed sendiri, dan submit hasil posting beserta bukti.',
   VIEWER: 'Akses read-only untuk dashboard, reports, dan exports.',
 } as const
 

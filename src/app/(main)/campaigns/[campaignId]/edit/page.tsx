@@ -20,6 +20,7 @@ function toSelectableMembers(
   const rows = new Map<string, MockMember>()
 
   for (const user of users?.items ?? []) {
+    if (user.role === 'PIC') continue
     rows.set(user.id, { id: user.id, name: user.name, role: user.role })
   }
 
@@ -27,7 +28,7 @@ function toSelectableMembers(
     const role = member.roleInCampaign === 'ADMIN' || member.roleInCampaign === 'BUZZER' || member.roleInCampaign === 'VIEWER'
       ? member.roleInCampaign
       : member.user?.role
-    if (member.userId && role) {
+    if (member.userId && role && role !== 'PIC') {
       rows.set(member.userId, {
         id: member.userId,
         name: member.user?.name ?? member.userId,

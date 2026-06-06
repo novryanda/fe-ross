@@ -40,7 +40,7 @@ function asOptionalString(value: unknown): string | undefined {
   return typeof value === "string" && value.length > 0 ? value : undefined;
 }
 
-const ROLE_VALUES = new Set<UserRole>(["ADMIN", "BUZZER", "VIEWER"]);
+const ROLE_VALUES = new Set<UserRole>(["ADMIN", "BUZZER", "PIC", "VIEWER"]);
 
 function asRole(value: unknown): UserRole | undefined {
   return typeof value === "string" && ROLE_VALUES.has(value as UserRole)
