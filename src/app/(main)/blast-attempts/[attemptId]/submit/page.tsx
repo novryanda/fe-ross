@@ -6,6 +6,7 @@ import { blastApi } from '@/lib/api/blast'
 import { useAuthStore } from '@/stores/auth-store'
 import { CountdownTimer } from '@/components/ui/countdown-timer'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { EmptyState } from '@/components/ui/empty-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { RoleGuard } from '@/components/layout/role-guard'
@@ -181,7 +182,9 @@ export default function SubmitBlastReportPage() {
             <PlatformBadge platform={attempt.blastTarget!.platform} />
             <StatusBadge status={attempt.status} type="attempt" />
             <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Attempt #{attempt.attemptNo}</span>
-            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Source: @{attempt.blastTarget?.socialAccount?.username}</span>
+            <span style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>
+              Source: <SocialAccountUsernameLink account={attempt.blastTarget?.socialAccount} style={{ fontSize: '0.8125rem', fontWeight: 600 }} />
+            </span>
           </div>
           <div style={{ marginTop: '0.875rem' }}>
             <a href={attempt.blastTarget?.postUrl} target="_blank" rel="noopener noreferrer"

@@ -1,14 +1,16 @@
 'use client'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
-import { AlertCircle, CalendarDays, CheckCircle2, Circle, FileText, Flag, Info, Save, Send, Shield, Users, Plus, X } from 'lucide-react'
+import { AlertCircle, CalendarDays, CheckCircle2, Circle, Flag, Info, Save, Send, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { PlatformBadge, StatusBadge, RoleBadge } from '@/components/ui/badges'
+import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { useAuth } from '@/hooks/use-auth'
 import type { CampaignStatus, Platform } from '@/types'
 import { AddCampaignMemberModal } from './add-campaign-member-modal'
+import { CampaignMembersSection } from './campaign-members-section'
 
-export type CampaignMemberRole = 'ADMIN' | 'BUZZER' | 'VIEWER'
+export type CampaignMemberRole = 'ADMIN' | 'BUZZER' | 'PIC' | 'VIEWER'
 
 export interface MockMember {
   id: string
@@ -27,7 +29,6 @@ export interface ChecklistItem {
 export interface EnterpriseCampaignPayload {
   name: string
   description?: string
-  objective: string
   startDate: string
   endDate: string
   platforms: Platform[]
@@ -35,9 +36,9 @@ export interface EnterpriseCampaignPayload {
   members: {
     adminIds: string[]
     buzzerIds: string[]
+    picIds: string[]
     viewerIds: string[]
   }
-  internalNotes?: string
 }
 
 interface EnterpriseCampaignFormProps {
@@ -61,6 +62,7 @@ export const MOCK_MEMBERS: MockMember[] = [
   { id: 'buzzer-novasyn', name: 'NovaSyn', role: 'BUZZER' },
   { id: 'buzzer-sparkwave', name: 'SparkWave', role: 'BUZZER' },
   { id: 'buzzer-cipherqueen', name: 'CipherQueen', role: 'BUZZER' },
+  { id: 'pic-fieldops', name: 'FieldOps PIC', role: 'PIC' },
   { id: 'viewer-jordan', name: 'Jordan Lee', role: 'VIEWER' },
   { id: 'viewer-viralvortex', name: 'ViralVortex', role: 'VIEWER' },
   { id: 'viewer-echolaunch', name: 'EchoLaunch', role: 'VIEWER' },
@@ -84,30 +86,54 @@ export function SectionHeader({ number, title, icon, action }: { number: number;
 }
 
 export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availableMembers = MOCK_MEMBERS, membersLoading }: EnterpriseCampaignFormProps) {
+  const { user } = useAuth()
+  const creatorAdminId = user?.role === 'ADMIN' ? user.id : undefined
+
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
-  const [objective, setObjective] = useState('')
   const [startDate, setStartDate] = useState('')
   const [endDate, setEndDate] = useState('')
   const [platforms, setPlatforms] = useState<Platform[]>([])
   const [status, setStatus] = useState<Extract<CampaignStatus, 'DRAFT' | 'ACTIVE'>>('DRAFT')
-  const [adminIds, setAdminIds] = useState<string[]>([])
+  const [adminIds, setAdminIds] = useState<string[]>(() => (creatorAdminId ? [creatorAdminId] : []))
   const [buzzerIds, setBuzzerIds] = useState<string[]>([])
+  const [picIds, setPicIds] = useState<string[]>([])
   const [viewerIds, setViewerIds] = useState<string[]>([])
-  const [notes, setNotes] = useState('')
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
 
-  const admins = availableMembers.filter(user => user.role === 'ADMIN')
-  const buzzers = availableMembers.filter(user => user.role === 'BUZZER')
-  const viewers = availableMembers.filter(user => user.role === 'VIEWER')
+  useEffect(() => {
+    if (!creatorAdminId) return
+    setAdminIds(current => (current.includes(creatorAdminId) ? current : [creatorAdminId, ...current]))
+  }, [creatorAdminId])
+
+  const selectableMembers = useMemo(() => {
+    if (!creatorAdminId || availableMembers.some(member => member.id === creatorAdminId)) {
+      return availableMembers
+    }
+
+    return [
+      {
+        id: creatorAdminId,
+        name: user?.name ?? 'Current Admin',
+        role: 'ADMIN' as const,
+        email: user?.email,
+      },
+      ...availableMembers,
+    ]
+  }, [availableMembers, creatorAdminId, user?.email, user?.name])
+
+  const admins = selectableMembers.filter(user => user.role === 'ADMIN')
+  const buzzers = selectableMembers.filter(user => user.role === 'BUZZER')
+  const pics = selectableMembers.filter(user => user.role === 'PIC')
+  const viewers = selectableMembers.filter(user => user.role === 'VIEWER')
   const selectedAdmins = admins.filter(user => adminIds.includes(user.id))
   const selectedBuzzers = buzzers.filter(user => buzzerIds.includes(user.id))
+  const selectedPics = pics.filter(user => picIds.includes(user.id))
   const selectedViewers = viewers.filter(user => viewerIds.includes(user.id))
   const periodInvalid = Boolean(startDate && endDate && endDate < startDate)
 
   const checklist = useMemo(() => [
     { label: 'Campaign name', ready: name.trim().length >= 3, emptyLabel: 'Belum diisi' },
-    { label: 'Objective (UI-only)', ready: true, emptyLabel: 'Opsional' },
     { label: 'Period', ready: Boolean(startDate && endDate && !periodInvalid), emptyLabel: periodInvalid ? 'Tanggal tidak valid' : 'Belum lengkap', invalid: periodInvalid },
     { label: 'Platforms selected', ready: platforms.length > 0, emptyLabel: 'Belum dipilih' },
     { label: 'Admin members', ready: true, emptyLabel: 'Opsional' },
@@ -130,15 +156,16 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
   }
 
   const handleConfirmMembers = (users: MockMember[]) => {
-    setAdminIds(users.filter(u => u.role === 'ADMIN').map(u => u.id))
+    const nextAdminIds = users.filter(u => u.role === 'ADMIN').map(u => u.id)
+    setAdminIds(creatorAdminId ? [...new Set([creatorAdminId, ...nextAdminIds])] : nextAdminIds)
     setBuzzerIds(users.filter(u => u.role === 'BUZZER').map(u => u.id))
+    setPicIds(users.filter(u => u.role === 'PIC').map(u => u.id))
     setViewerIds(users.filter(u => u.role === 'VIEWER').map(u => u.id))
   }
 
   const buildPayload = (draftStatus: Extract<CampaignStatus, 'DRAFT' | 'ACTIVE'> = status): EnterpriseCampaignPayload => ({
     name: name.trim() || 'Untitled Campaign Draft',
     description: description.trim() || undefined,
-    objective: objective.trim(),
     startDate,
     endDate,
     platforms,
@@ -146,9 +173,9 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
     members: {
       adminIds,
       buzzerIds,
+      picIds,
       viewerIds,
     },
-    internalNotes: notes.trim() || undefined,
   })
 
   const summaryText = (value: string) => value.trim() || 'Belum diisi'
@@ -164,10 +191,6 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
               <div className="form-group">
                 <label className="form-label">Description <span className="form-label-optional">Optional</span></label>
                 <textarea className="input-field" rows={3} value={description} onChange={event => setDescription(event.target.value)} placeholder="Deskripsi singkat campaign..." style={{ resize: 'vertical' }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Objective <span className="required-dot">Required</span></label>
-                <textarea className="input-field" rows={3} value={objective} onChange={event => setObjective(event.target.value)} placeholder="Tujuan utama campaign dan outcome yang ingin dicapai..." style={{ resize: 'vertical' }} required />
               </div>
             </div>
           </section>
@@ -276,55 +299,22 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
           </section>
 
           <section className="campaign-create-section">
-            <SectionHeader 
-              number={5} 
-              title="Campaign Members" 
-              icon={<Users size={15} />} 
-              action={
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={14} />}>
-                  Add Member
-                </Button>
-              }
+            <CampaignMembersSection
+              admins={selectedAdmins}
+              buzzers={selectedBuzzers}
+              pics={selectedPics}
+              viewers={selectedViewers}
+              membersLoading={membersLoading}
+              onAddMember={() => setIsMemberModalOpen(true)}
+              onRemoveAdmin={(id) => {
+                if (id === creatorAdminId) return
+                setAdminIds(prev => prev.filter(x => x !== id))
+              }}
+              onRemoveBuzzer={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))}
+              onRemovePic={(id) => setPicIds(prev => prev.filter(x => x !== id))}
+              onRemoveViewer={(id) => setViewerIds(prev => prev.filter(x => x !== id))}
+              lockedAdminIds={creatorAdminId ? [creatorAdminId] : undefined}
             />
-            <p className="section-helper-text">Assignment ini berlaku untuk Campaign. Blast Link baru otomatis terbuka untuk semua Buzzer member campaign.</p>
-            {membersLoading && <p className="muted-meta">Memuat user aktif...</p>}
-            
-            {(!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length) ? (
-              <div style={{ padding: '2.5rem', textAlign: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 12, background: 'var(--bg-surface)' }}>
-                <Users size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem', opacity: 0.5 }} />
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Belum ada member dipilih. Klik Add Member untuk menambahkan user.</p>
-                <Button type="button" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={16} />}>Add Member</Button>
-              </div>
-            ) : (
-              <div className="member-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                <MemberGroup 
-                  title="ADMIN" 
-                  users={selectedAdmins} 
-                  required 
-                  onRemove={(id) => setAdminIds(prev => prev.filter(x => x !== id))} 
-                />
-                <MemberGroup 
-                  title="BUZZERS" 
-                  users={selectedBuzzers} 
-                  required={status === 'ACTIVE'} 
-                  onRemove={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))} 
-                />
-                <MemberGroup 
-                  title="VIEWERS" 
-                  users={selectedViewers} 
-                  onRemove={(id) => setViewerIds(prev => prev.filter(x => x !== id))} 
-                />
-              </div>
-            )}
-          </section>
-
-          <section className="campaign-create-section">
-            <SectionHeader number={6} title="Notes" icon={<FileText size={15} />} />
-            <div className="form-group">
-              <label className="form-label">Internal Notes <span className="form-label-optional">Optional</span></label>
-              <textarea className="input-field" rows={4} value={notes} onChange={event => setNotes(event.target.value.slice(0, 500))} placeholder="Catatan internal untuk tim campaign..." style={{ resize: 'vertical' }} />
-              <span className="form-hint">{notes.length}/500 characters</span>
-            </div>
           </section>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
@@ -337,14 +327,13 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
       <aside style={{ position: 'sticky', top: 72, display: 'grid', gap: '1rem' }}>
         <CampaignSummaryCard
           name={summaryText(name)}
-          objective={summaryText(objective)}
           period={startDate || endDate ? `${startDate || '-'} - ${endDate || '-'}` : 'Belum diisi'}
           platforms={platforms}
           status={status}
           adminCount={adminIds.length}
           buzzerCount={buzzerIds.length}
+          picCount={picIds.length}
           viewerCount={viewerIds.length}
-          notes={notes.trim() || 'Belum diisi'}
         />
         <CompletionChecklistCard items={checklist} />
         <div className="campaign-summary-panel">
@@ -363,57 +352,10 @@ export function EnterpriseCampaignForm({ onCreate, onSaveDraft, loading, availab
       <AddCampaignMemberModal
         open={isMemberModalOpen}
         onOpenChange={setIsMemberModalOpen}
-        availableMembers={availableMembers}
-        selectedUserIds={[...adminIds, ...buzzerIds, ...viewerIds]}
+        availableMembers={selectableMembers}
+        selectedUserIds={[...adminIds, ...buzzerIds, ...picIds, ...viewerIds]}
         onConfirm={handleConfirmMembers}
       />
-    </div>
-  )
-}
-
-export function MemberGroup({ title, required, users, onRemove }: { title: string; required?: boolean; users: MockMember[]; onRemove: (id: string) => void }) {
-  if (users.length === 0 && !required) return null
-
-  return (
-    <div>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.75rem' }}>
-        <h4 style={{ fontSize: '0.85rem', fontWeight: 800, color: 'var(--text-secondary)', letterSpacing: 1 }}>{title}</h4>
-        <span style={{ fontSize: '0.75rem', background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', padding: '0 6px', borderRadius: 12 }}>{users.length}</span>
-        {required && <span className="required-dot" style={{ marginLeft: 'auto' }}>REQUIRED</span>}
-      </div>
-      
-      <div style={{ display: 'grid', gap: '0.5rem' }}>
-        {users.length === 0 ? (
-          <div style={{ padding: '0.75rem', border: '1px dashed var(--border-subtle)', borderRadius: 8, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-            Belum ada member
-          </div>
-        ) : (
-          users.map(user => (
-            <div key={user.id} style={{
-              display: 'flex', alignItems: 'center', gap: '0.75rem', padding: '0.65rem 0.75rem',
-              background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: 8
-            }}>
-              <div className="mini-avatar" style={{ width: 32, height: 32, fontSize: '0.85rem' }}>{initials(user.name)}</div>
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: '0.85rem', color: 'var(--text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</div>
-                {user.email && <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>}
-                <div style={{ marginTop: 2 }}><RoleBadge role={user.role} /></div>
-              </div>
-              <button 
-                type="button"
-                onClick={() => onRemove(user.id)}
-                style={{
-                  background: 'rgba(255,0,60,0.1)', border: 'none', color: 'var(--red)', 
-                  padding: 6, borderRadius: 6, cursor: 'pointer', transition: 'all 0.2s', flexShrink: 0
-                }}
-                title="Remove Member"
-              >
-                <X size={14} />
-              </button>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   )
 }
@@ -421,25 +363,23 @@ export function MemberGroup({ title, required, users, onRemove }: { title: strin
 export function CampaignSummaryCard({
   title = 'Campaign Summary',
   name,
-  objective,
   period,
   platforms,
   status,
   adminCount,
   buzzerCount,
+  picCount,
   viewerCount,
-  notes,
 }: {
   title?: string
   name: string
-  objective: string
   period: string
   platforms: Platform[]
   status: CampaignStatus
   adminCount: number
   buzzerCount: number
+  picCount: number
   viewerCount: number
-  notes: string
 }) {
   return (
     <div className="campaign-summary-panel">
@@ -448,7 +388,6 @@ export function CampaignSummaryCard({
         <strong>{title}</strong>
       </div>
       <div className="summary-line"><div className="summary-label">Name</div><div className="summary-value">{name}</div></div>
-      <div className="summary-line"><div className="summary-label">Objective</div><div className="summary-value">{objective}</div></div>
       <div className="summary-line"><div className="summary-label">Period</div><div className="summary-value">{period}</div></div>
       <div className="summary-line">
         <div className="summary-label">Platforms</div>
@@ -459,9 +398,8 @@ export function CampaignSummaryCard({
       <div className="summary-line"><div className="summary-label">Status</div><div className="summary-value"><StatusBadge status={status} type="campaign" size="sm" /></div></div>
       <div className="summary-line">
         <div className="summary-label">Members</div>
-        <div className="summary-value">{adminCount} Admin / {buzzerCount} Buzzer / {viewerCount} Viewer</div>
+        <div className="summary-value">{adminCount} Admin / {buzzerCount} Buzzer / {picCount} PIC / {viewerCount} Viewer</div>
       </div>
-      <div className="summary-line"><div className="summary-label">Notes</div><div className="summary-value">{notes}</div></div>
     </div>
   )
 }

@@ -5,6 +5,28 @@ export const loginSchema = z.object({
   password: z.string().min(6, "Password minimal 6 karakter."),
 });
 
+export const forgotPasswordSchema = z.object({
+  email: z.string().email("Email tidak valid."),
+});
+
+export const resetPasswordSchema = z
+  .object({
+    newPassword: z
+      .string()
+      .min(8, "Password baru minimal 8 karakter.")
+      .max(128, "Password baru maksimal 128 karakter."),
+    confirmPassword: z.string().min(1, "Konfirmasi password wajib diisi."),
+  })
+  .superRefine((data, ctx) => {
+    if (data.newPassword !== data.confirmPassword) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["confirmPassword"],
+        message: "Konfirmasi password harus sama dengan password baru.",
+      });
+    }
+  });
+
 export const campaignSchema = z.object({
   name: z
     .string()
@@ -59,6 +81,7 @@ export const createMemberSchema = z
       .array(z.string().uuid("Campaign ID harus UUID."))
       .max(100, "Maksimal 100 campaign sekaligus.")
       .optional(),
+    sendInviteEmail: z.boolean().default(false),
     setTemporaryPassword: z.boolean().default(false),
     temporaryPassword: z
       .string()
@@ -143,6 +166,8 @@ export const commentProofSchema = z.object({
 });
 
 export type LoginForm = z.infer<typeof loginSchema>;
+export type ForgotPasswordForm = z.infer<typeof forgotPasswordSchema>;
+export type ResetPasswordForm = z.infer<typeof resetPasswordSchema>;
 export type CampaignForm = z.infer<typeof campaignSchema>;
 export type BlastTargetForm = z.infer<typeof blastTargetSchema>;
 export type BlastReportForm = z.infer<typeof blastReportSchema>;

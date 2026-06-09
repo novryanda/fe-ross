@@ -88,20 +88,36 @@ export function PlatformBadge({ platform, size = 'md' }: { platform: Platform; s
 
   return (
     <span className={`platform-badge platform-${platform.toLowerCase().replace('_', '-')}`} style={{ display: 'inline-flex', alignItems: 'center', gap: '0.35rem' }}>
-      <div 
+      <span
         style={{
           width: iconSize,
           height: iconSize,
-          background: style.background,
-          WebkitMaskImage: `url(${style.icon})`,
-          maskImage: `url(${style.icon})`,
-          WebkitMaskRepeat: 'no-repeat',
-          maskRepeat: 'no-repeat',
-          WebkitMaskSize: 'contain',
-          maskSize: 'contain',
-          flexShrink: 0
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          overflow: 'hidden',
+          isolation: 'isolate',
+          contain: 'paint',
+          flexShrink: 0,
         }}
-      />
+      >
+        <span
+          style={{
+            width: iconSize,
+            height: iconSize,
+            display: 'block',
+            background: style.background,
+            WebkitMaskImage: `url(${style.icon})`,
+            maskImage: `url(${style.icon})`,
+            WebkitMaskRepeat: 'no-repeat',
+            maskRepeat: 'no-repeat',
+            WebkitMaskSize: 'contain',
+            maskSize: 'contain',
+            WebkitMaskPosition: 'center',
+            maskPosition: 'center',
+          }}
+        />
+      </span>
       {platform === 'X_TWITTER' ? 'X' : platform.charAt(0) + platform.slice(1).toLowerCase()}
     </span>
   )

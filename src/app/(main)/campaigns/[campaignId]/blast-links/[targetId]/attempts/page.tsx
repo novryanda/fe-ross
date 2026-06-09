@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { blastApi } from '@/lib/api/blast'
 import { PageHeader } from '@/components/ui/page-header'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { Skeleton } from '@/components/ui/skeleton'
 import { formatDate, formatDateTime, formatNumber, getAttemptStatusConfig } from '@/lib/utils'
 import {
@@ -50,7 +51,7 @@ export default function AttemptHistoryPage() {
           <PlatformBadge platform={target.platform} size="sm" />
         </div>
         <div style={{ height: 24, width: 1, background: 'var(--border-subtle)' }} />
-        <div style={{ fontSize: '0.8125rem', color: 'var(--text-primary)', fontWeight: 500 }}>@{target.socialAccount?.username ?? '—'}</div>
+        <SocialAccountUsernameLink account={target.socialAccount} style={{ fontSize: '0.8125rem', fontWeight: 500 }} />
         <div style={{ height: 24, width: 1, background: 'var(--border-subtle)' }} />
         <a href={target.postUrl} target="_blank" rel="noopener noreferrer" className="ext-link" style={{ fontSize: '0.75rem' }}>
           {target.postUrl.replace('https://', '').slice(0, 40)}... <ExternalLink size={10} />

@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Info } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { EnterpriseCampaignForm, type EnterpriseCampaignPayload, type MockMember } from '@/components/features/campaign/enterprise-campaign-form'
 import { campaignsApi } from '@/lib/api/campaigns'
 import { campaignMembersApi } from '@/lib/api/campaign-members'
@@ -11,13 +11,11 @@ import { usersApi } from '@/lib/api/users'
 import { toast } from 'sonner'
 
 function toSelectableMembers(users: Awaited<ReturnType<typeof usersApi.list>> | undefined): MockMember[] {
-  return (users?.items ?? [])
-    .filter((user) => user.role !== 'PIC')
-    .map(user => ({
-      id: user.id,
-      name: user.name,
-      role: user.role as MockMember['role'],
-    }))
+  return (users?.items ?? []).map(user => ({
+    id: user.id,
+    name: user.name,
+    role: user.role as MockMember['role'],
+  }))
 }
 
 export default function NewCampaignPage() {
@@ -31,7 +29,7 @@ export default function NewCampaignPage() {
   const createMutation = useMutation({
     mutationFn: async (data: EnterpriseCampaignPayload) => {
       const campaign = await campaignsApi.create(data)
-      const selectedCount = data.members.adminIds.length + data.members.buzzerIds.length + data.members.viewerIds.length
+      const selectedCount = data.members.adminIds.length + data.members.buzzerIds.length + data.members.picIds.length + data.members.viewerIds.length
 
       if (selectedCount > 0) {
         try {
@@ -79,10 +77,6 @@ export default function NewCampaignPage() {
           <div className="section-kicker">Campaign Setup</div>
           <h1 className="section-title" style={{ fontSize: '2rem' }}>Create Campaign</h1>
           <p className="section-subtitle">Buat campaign baru dan tetapkan platform, periode, serta anggota tim.</p>
-          <div className="blast-info-banner" style={{ marginTop: '1rem', marginBottom: 0 }}>
-            <Info size={18} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
-            <span>Objective dan internal notes masih UI-only untuk saat ini; backend campaign menerima nama, deskripsi, platform, periode, dan status.</span>
-          </div>
         </div>
       </div>
 

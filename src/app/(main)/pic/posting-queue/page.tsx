@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, Inbox, Send } from 'lucide-react'
+import { Inbox, Send } from 'lucide-react'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataFilters } from '@/components/ui/data-filters'
@@ -15,7 +15,6 @@ import { PlatformBadge } from '@/components/ui/badges'
 import { postingOrdersApi } from '@/lib/api/posting-orders'
 import { socialAccountsApi } from '@/lib/api/social-accounts'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
-import { useAuth } from '@/hooks/use-auth'
 import { formatDateTime } from '@/lib/utils'
 import type { Platform, PostingOrderStatus } from '@/types'
 import { toast } from 'sonner'
@@ -29,8 +28,8 @@ const platformOptions: { value: Platform; label: string }[] = [
 
 function OrderChip({ status }: { status: PostingOrderStatus }) {
   const config: Record<PostingOrderStatus, { label: string; color: string }> = {
-    PUBLISHED_TO_QUEUE: { label: 'Published', color: 'var(--cyan)' },
-    CLAIMED: { label: 'Claimed', color: 'var(--status-expired)' },
+    PUBLISHED_TO_QUEUE: { label: 'Assigned', color: 'var(--cyan)' },
+    CLAIMED: { label: 'Assigned', color: 'var(--cyan)' },
     COMPLETED: { label: 'Completed', color: 'var(--status-active)' },
     CANCELLED: { label: 'Cancelled', color: 'var(--status-rejected)' },
   }
@@ -58,7 +57,6 @@ function OrderChip({ status }: { status: PostingOrderStatus }) {
 
 export default function PicPostingQueuePage() {
   const queryClient = useQueryClient()
-  const { user } = useAuth()
   const [search, setSearch] = useState('')
   const [platformFilter, setPlatformFilter] = useState('')
   const [submitOrderId, setSubmitOrderId] = useState<string | null>(null)
@@ -80,25 +78,6 @@ export default function PicPostingQueuePage() {
   const accountsQuery = useQuery({
     queryKey: ['pic-social-accounts', 'active'],
     queryFn: () => socialAccountsApi.list({ limit: 100, status: 'ACTIVE' }),
-  })
-
-  const claimMutation = useMutation({
-    mutationFn: (orderId: string) => postingOrdersApi.claimOrder(orderId),
-    onSuccess: () => {
-      toast.success('Order berhasil di-claim.')
-      queryClient.invalidateQueries({ queryKey: ['pic-posting-queue'] })
-      queryClient.invalidateQueries({ queryKey: ['pic-my-submissions'] })
-    },
-    onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
-  })
-
-  const releaseMutation = useMutation({
-    mutationFn: (orderId: string) => postingOrdersApi.releaseOrder(orderId),
-    onSuccess: () => {
-      toast.success('Order berhasil dilepas kembali ke queue.')
-      queryClient.invalidateQueries({ queryKey: ['pic-posting-queue'] })
-    },
-    onError: (error) => toast.error(mapApiErrorToToastMessage(error)),
   })
 
   const submitMutation = useMutation({
@@ -140,17 +119,13 @@ export default function PicPostingQueuePage() {
       <div className="page-container">
         <PageHeader
           title="Posting Queue"
-          subtitle="Ambil posting order dari unit Anda, kerjakan postingnya, lalu submit URL hasil dan bukti drive."
+          subtitle="Semua posting order di unit Anda adalah tugas bersama. Kerjakan postingnya dengan akun Anda lalu submit hasilnya."
         />
-
-        <div className="info-banner info-banner-cyan">
-          Gunakan akun sosmed milik Anda sendiri saat submit hasil posting. Submission akan direview admin sebelum bisa dipakai sebagai blast source.
-        </div>
 
         <DataFilters
           search={search}
           onSearchChange={setSearch}
-          placeholder="Search queue..."
+          placeholder="Search judul, campaign, atau queue..."
           filters={[
             { label: 'Platform', value: platformFilter, options: platformOptions, onChange: setPlatformFilter },
           ]}
@@ -172,12 +147,11 @@ export default function PicPostingQueuePage() {
           <EmptyState
             icon={<Inbox size={48} />}
             title="Queue kosong"
-            description="Belum ada posting order yang cocok dengan unit atau filter Anda."
+            description="Tidak ada posting order aktif yang masih menunggu submission dari Anda."
           />
         ) : (
           <div style={{ display: 'grid', gap: '0.85rem' }}>
             {orders.map((order) => {
-              const isClaimedByMe = order.claimedById === user?.id
               return (
                 <article key={order.id} className="card" style={{ padding: '1rem', display: 'grid', gap: '0.65rem' }}>
                   <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
@@ -187,6 +161,9 @@ export default function PicPostingQueuePage() {
                         <OrderChip status={order.status} />
                       </div>
                       <div style={{ fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.5rem' }}>
+                        {order.title}
+                      </div>
+                      <div className="muted-meta" style={{ marginTop: '0.2rem' }}>
                         {order.campaign?.name ?? 'Campaign'} / {order.targetUnit?.name ?? 'Unit'}
                       </div>
                     </div>
@@ -198,38 +175,14 @@ export default function PicPostingQueuePage() {
                   <div className="muted-meta">Schedule: {formatDateTime(order.scheduledAt)}</div>
                   {order.caption && <div style={{ color: 'var(--text-secondary)', fontSize: '0.83rem' }}>Caption: {order.caption}</div>}
                   {order.description && <div style={{ color: 'var(--text-secondary)', fontSize: '0.83rem' }}>Desc: {order.description}</div>}
-                  {order.claimedByUser && (
-                    <div className="muted-meta">
-                      Claimed by {order.claimedByUser.name} {order.claimedAt ? `at ${formatDateTime(order.claimedAt)}` : ''}
-                    </div>
-                  )}
+                  <div className="muted-meta">
+                    {order.submissionCount ?? 0} submission masuk untuk order ini.
+                  </div>
 
                   <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-                    {order.status === 'PUBLISHED_TO_QUEUE' && (
-                      <button
-                        type="button"
-                        className="btn-primary"
-                        onClick={() => claimMutation.mutate(order.id)}
-                        disabled={claimMutation.isPending}
-                      >
-                        <CheckCircle2 size={14} /> Claim Order
-                      </button>
-                    )}
-                    {isClaimedByMe && (
-                      <>
-                        <button type="button" className="btn-secondary" onClick={() => setSubmitOrderId(order.id)}>
-                          <Send size={14} /> Submit Result
-                        </button>
-                        <button
-                          type="button"
-                          className="btn-ghost"
-                          onClick={() => releaseMutation.mutate(order.id)}
-                          disabled={releaseMutation.isPending}
-                        >
-                          Release
-                        </button>
-                      </>
-                    )}
+                    <button type="button" className="btn-primary" onClick={() => setSubmitOrderId(order.id)}>
+                      <Send size={14} /> Submit Result
+                    </button>
                   </div>
                 </article>
               )
@@ -250,6 +203,9 @@ export default function PicPostingQueuePage() {
                   <OrderChip status={selectedOrder.status} />
                 </div>
                 <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                  {selectedOrder.title}
+                </div>
+                <div className="muted-meta" style={{ marginTop: '0.35rem' }}>
                   {selectedOrder.campaign?.name ?? 'Campaign'} / {selectedOrder.targetUnit?.name ?? 'Unit'}
                 </div>
               </div>

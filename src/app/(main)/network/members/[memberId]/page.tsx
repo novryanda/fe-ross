@@ -92,6 +92,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
   const [picUnitIdDraft, setPicUnitIdDraft] = useState(user.picUnit?.id ?? '')
 
   const [resetOpen, setResetOpen] = useState(false)
+  const [sendResetEmail, setSendResetEmail] = useState(true)
   const [resetPassword, setResetPassword] = useState('')
   const [resetRevokeSessions, setResetRevokeSessions] = useState(true)
   const [resetRequireChange, setResetRequireChange] = useState(true)
@@ -123,9 +124,18 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
 
   const resetMutation = useMutation({
     mutationFn: (dto: AdminResetPasswordDto) => usersApi.resetPassword(memberId, dto),
-    onSuccess: () => {
-      toast.success('Password member berhasil direset.')
+    onSuccess: (result) => {
+      if (result.mode === 'email_link') {
+        if (result.emailSent) {
+          toast.success('Link reset password berhasil dikirim ke email user.')
+        } else {
+          toast.warning('Reset password tercatat, tetapi email gagal dikirim.')
+        }
+      } else {
+        toast.success('Password member berhasil direset.')
+      }
       setResetOpen(false)
+      setSendResetEmail(true)
       setResetPassword('')
       queryClient.invalidateQueries({ queryKey: ['users'] })
       queryClient.invalidateQueries({ queryKey: ['users', 'detail', memberId] })
@@ -143,7 +153,8 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
   const hasEdit = roleChanged || statusChanged || picUnitChanged
   const saveDisabled = !hasEdit || updateMutation.isPending
 
-  const canResetSubmit = resetPassword.length >= 8 && !resetMutation.isPending
+  const canResetSubmit =
+    (sendResetEmail || resetPassword.length >= 8) && !resetMutation.isPending
 
   const handleSaveRoleStatus = () => {
     if (!hasEdit) return
@@ -166,7 +177,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
   const handleResetSubmit = () => {
     if (!canResetSubmit) return
     resetMutation.mutate({
-      newPassword: resetPassword,
+      ...(sendResetEmail ? { sendResetEmail: true } : { newPassword: resetPassword }),
       revokeSessions: resetRevokeSessions,
       requirePasswordChange: resetRequireChange,
     })
@@ -408,6 +419,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
           onClose={() => {
             if (!resetMutation.isPending) {
               setResetOpen(false)
+              setSendResetEmail(true)
               setResetPassword('')
             }
           }}
@@ -415,16 +427,28 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
         >
           <div style={{ display: 'grid', gap: '1rem' }}>
             <p className="muted-meta">
-              Password baru akan di-hash oleh backend. Sampaikan ke user lewat channel aman (contoh: secure messenger). Opsi revoke sessions akan mem-force logout di semua perangkat user ini.
+              Anda bisa mengirim link reset password ke email user, atau menetapkan password manual dari panel admin. Opsi revoke sessions akan mem-force logout di semua perangkat user ini.
             </p>
-            <Input
-              label="New Password"
-              type="text"
-              value={resetPassword}
-              onChange={(event) => setResetPassword(event.target.value)}
-              placeholder="Min 8 karakter"
-              disabled={resetMutation.isPending}
-            />
+            <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.85rem' }}>
+              <input
+                type="checkbox"
+                checked={sendResetEmail}
+                onChange={(event) => setSendResetEmail(event.target.checked)}
+                disabled={resetMutation.isPending}
+              />
+              Kirim link reset password ke email user
+            </label>
+            {!sendResetEmail && (
+              <Input
+                label="New Password"
+                type="text"
+                value={resetPassword}
+                onChange={(event) => setResetPassword(event.target.value)}
+                placeholder="Min 8 karakter"
+                hint="Password akan di-hash oleh backend. Sampaikan ke user lewat channel aman."
+                disabled={resetMutation.isPending}
+              />
+            )}
             <label style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', fontSize: '0.85rem' }}>
               <input
                 type="checkbox"
@@ -449,6 +473,7 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
                 className="btn-secondary"
                 onClick={() => {
                   setResetOpen(false)
+                  setSendResetEmail(true)
                   setResetPassword('')
                 }}
                 disabled={resetMutation.isPending}
@@ -457,7 +482,11 @@ function MemberDetailBody({ user, memberId }: { user: UserDetail; memberId: stri
               </button>
               <button type="button" className="btn-primary" onClick={handleResetSubmit} disabled={!canResetSubmit}>
                 <KeyRound size={14} />
-                {resetMutation.isPending ? 'Resetting...' : 'Reset Password'}
+                {resetMutation.isPending
+                  ? 'Processing...'
+                  : sendResetEmail
+                    ? 'Send Reset Email'
+                    : 'Reset Password'}
               </button>
             </div>
           </div>

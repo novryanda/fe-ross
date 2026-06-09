@@ -37,6 +37,7 @@ export default function NewMemberPage() {
   const [status, setStatus] = useState<UserStatus>('ACTIVE')
   const [picUnitId, setPicUnitId] = useState('')
   const [selectedCampaigns, setSelectedCampaigns] = useState<string[]>([])
+  const [sendInviteEmail, setSendInviteEmail] = useState(true)
   const [setTemporaryPasswordOn, setSetTemporaryPasswordOn] = useState(false)
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [requirePasswordChange, setRequirePasswordChange] = useState(true)
@@ -55,8 +56,14 @@ export default function NewMemberPage() {
 
   const createMutation = useMutation({
     mutationFn: (dto: CreateUserDto) => usersApi.create(dto),
-    onSuccess: () => {
-      toast.success('Member berhasil dibuat.')
+    onSuccess: (created) => {
+      if (created.inviteRequested && created.inviteEmailSent) {
+        toast.success('Member berhasil dibuat dan link password sudah dikirim ke email.')
+      } else if (created.inviteRequested && !created.inviteEmailSent) {
+        toast.warning('Member berhasil dibuat, tetapi email invite gagal dikirim.')
+      } else {
+        toast.success('Member berhasil dibuat.')
+      }
       queryClient.invalidateQueries({ queryKey: ['users'] })
       router.push('/network/members')
     },
@@ -75,8 +82,9 @@ export default function NewMemberPage() {
       email: email.trim(),
       role,
       status,
-      campaignIds: role === 'PIC' ? undefined : selectedCampaigns.length ? selectedCampaigns : undefined,
+      campaignIds: selectedCampaigns.length ? selectedCampaigns : undefined,
       picUnitId: role === 'PIC' ? picUnitId || undefined : undefined,
+      sendInviteEmail,
       setTemporaryPassword: setTemporaryPasswordOn,
       temporaryPassword: setTemporaryPasswordOn ? temporaryPassword : undefined,
       requirePasswordChange,
@@ -89,7 +97,7 @@ export default function NewMemberPage() {
       ok: false as const,
       issues: parsed.error.issues.map((issue) => issue.message),
     }
-  }, [fullName, email, role, status, picUnitId, selectedCampaigns, setTemporaryPasswordOn, temporaryPassword, requirePasswordChange, notes])
+  }, [fullName, email, role, status, picUnitId, selectedCampaigns, sendInviteEmail, setTemporaryPasswordOn, temporaryPassword, requirePasswordChange, notes])
 
   const checklist = [
     { label: 'Full name (min 2 karakter)', ready: fullName.trim().length >= 2 },
@@ -97,9 +105,7 @@ export default function NewMemberPage() {
     { label: 'Role selected', ready: Boolean(role) },
     {
       label: 'Credential flow selected',
-      ready: setTemporaryPasswordOn
-        ? temporaryPassword.length >= 8
-        : true,
+      ready: sendInviteEmail || !setTemporaryPasswordOn || temporaryPassword.length >= 8,
     },
   ]
 
@@ -119,6 +125,7 @@ export default function NewMemberPage() {
     }
     if (parsed.picUnitId) payload.picUnitId = parsed.picUnitId
     if (parsed.campaignIds?.length) payload.campaignIds = parsed.campaignIds
+    if (parsed.sendInviteEmail) payload.sendInviteEmail = true
     if (parsed.setTemporaryPassword && parsed.temporaryPassword) {
       payload.temporaryPassword = parsed.temporaryPassword
     }
@@ -148,7 +155,7 @@ export default function NewMemberPage() {
         <div className="info-banner info-banner-cyan" style={{ marginBottom: '1.25rem' }}>
           <AlertCircle size={18} style={{ color: 'var(--cyan)', flexShrink: 0, marginTop: 2 }} />
           <div>
-            Email invite belum didukung backend. Gunakan <strong>temporary password</strong> untuk onboarding awal, lalu minta user mengganti password dari menu Security.
+            Anda bisa kirim link email agar user membuat password sendiri, atau set temporary password manual bila diperlukan.
           </div>
         </div>
 
@@ -179,7 +186,6 @@ export default function NewMemberPage() {
                     const nextRole = event.target.value as UserRole
                     setRole(nextRole)
                     if (nextRole !== 'PIC') setPicUnitId('')
-                    if (nextRole === 'PIC') setSelectedCampaigns([])
                   }}
                   options={[
                     { value: 'ADMIN', label: 'ADMIN' },
@@ -220,13 +226,9 @@ export default function NewMemberPage() {
             <div className="form-section">
               <div className="form-section-title"><span className="step-number">2</span> Access & Campaigns</div>
               <p className="section-helper-text">
-                Untuk Buzzer, campaign membership memberikan akses queue/task. Untuk Viewer, akses campaign hanya read-only. PIC memakai assignment unit organisasi, bukan membership campaign.
+                Campaign membership menentukan campaign mana yang bisa diakses user. Buzzer mendapat blast queue, PIC mendapat posting bank campaign, Viewer read-only. PIC tetap wajib punya unit organisasi.
               </p>
-              {role === 'PIC' ? (
-                <div className="preview-card" style={{ color: 'var(--text-secondary)' }}>
-                  Role PIC tidak perlu assignment campaign di form ini. Queue PIC ditentukan dari unit organisasi target pada posting order.
-                </div>
-              ) : campaignsQuery.isLoading ? (
+              {campaignsQuery.isLoading ? (
                 <div className="skeleton" style={{ height: 56, borderRadius: 10 }} />
               ) : !campaigns.length ? (
                 <div className="preview-card" style={{ color: 'var(--text-muted)' }}>
@@ -258,13 +260,18 @@ export default function NewMemberPage() {
               <div style={{ display: 'grid', gap: '0.75rem' }}>
                 <label
                   className="preview-card"
-                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', opacity: 0.7, cursor: 'not-allowed' }}
-                  title="Email invite belum tersedia di backend."
+                  style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', cursor: createMutation.isPending ? 'not-allowed' : 'pointer' }}
                 >
-                  <input type="checkbox" disabled aria-label="Send invite email" />
+                  <input
+                    type="checkbox"
+                    checked={sendInviteEmail}
+                    onChange={(event) => setSendInviteEmail(event.target.checked)}
+                    disabled={createMutation.isPending}
+                    aria-label="Send invite email"
+                  />
                   <span style={{ color: 'var(--cyan)', display: 'flex' }}><Mail size={15} /></span>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-                    Send invite email <span className="muted-meta">— Coming soon</span>
+                    Send invite email <span className="muted-meta">- link buat/reset password dikirim ke email user</span>
                   </span>
                 </label>
 
@@ -302,7 +309,7 @@ export default function NewMemberPage() {
                   />
                   <span style={{ color: 'var(--cyan)', display: 'flex' }}><CheckCircle2 size={15} /></span>
                   <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>
-                    Require password change on first login <span className="muted-meta">— tercatat di audit log</span>
+                    Require password change on first login <span className="muted-meta">- tercatat di audit log</span>
                   </span>
                 </label>
               </div>

@@ -2,10 +2,11 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Edit2, ExternalLink, RadioTower } from 'lucide-react'
+import { Archive, Edit2, RadioTower } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { ErrorState } from '@/components/ui/error-state'
 import { socialAccountsApi } from '@/lib/api/social-accounts'
@@ -112,7 +113,7 @@ export default function SocialAccountDetailPage() {
             <div className="form-section">
               <div className="form-section-title"><span className="step-number">1</span> Account Identity</div>
               <div className="summary-line"><div className="summary-label">Platform</div><div className="summary-value"><PlatformBadge platform={account.platform} /></div></div>
-              <div className="summary-line"><div className="summary-label">Username</div><div className="summary-value">@{account.username}</div></div>
+              <div className="summary-line"><div className="summary-label">Username</div><div className="summary-value"><SocialAccountUsernameLink account={account} /></div></div>
               <div className="summary-line"><div className="summary-label">Display Name</div><div className="summary-value">{account.displayName ?? '-'}</div></div>
               <div className="summary-line"><div className="summary-label">Category</div><div className="summary-value">{account.category}</div></div>
               <div className="summary-line"><div className="summary-label">Status</div><div className="summary-value"><StatusBadge type="social" status={account.status} /></div></div>
@@ -130,24 +131,13 @@ export default function SocialAccountDetailPage() {
             <div className="helper-block">
               <h3 style={{ fontSize: '0.95rem', fontWeight: 800, marginBottom: '0.75rem' }}>Account Summary</h3>
               <div className="preview-card">
-                <div style={{ fontSize: '1rem', fontWeight: 800 }}>@{account.username}</div>
+                <SocialAccountUsernameLink account={account} style={{ fontSize: '1rem' }} />
                 <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginTop: '0.25rem' }}>{account.displayName}</div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem', flexWrap: 'wrap' }}>
                   <PlatformBadge platform={account.platform} size="sm" />
                   <StatusBadge type="social" status={account.status} size="sm" />
                 </div>
               </div>
-            </div>
-            <div className="helper-block">
-              <Link
-                href={account.profileUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-secondary"
-                style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
-              >
-                <ExternalLink size={14} /> Open Profile
-              </Link>
             </div>
           </aside>
         </div>

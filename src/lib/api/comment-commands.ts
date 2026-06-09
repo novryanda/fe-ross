@@ -42,6 +42,16 @@ export interface CreateCommentCommandDto {
   status?: "DRAFT" | "ACTIVE";
 }
 
+export interface CreateCommentCommandFromSubmissionDto {
+  stance: Stance;
+  narrative: string;
+  instruction?: string;
+  requiredSlots: number;
+  keepExpiryMinutes?: number;
+  deadline: string;
+  status?: "DRAFT" | "ACTIVE";
+}
+
 export type UpdateCommentCommandDto = Partial<
   Omit<CreateCommentCommandDto, "status">
 >;
@@ -214,6 +224,18 @@ export const commentCommandsApi = {
     const response = await apiClient.post<unknown>(
       `/campaigns/${campaignId}/comment-commands`,
       toCommentCommandDto(dto as CommentCommandWriteForm),
+    );
+    return toCommentCommand(response.data);
+  },
+
+  async createFromSubmission(
+    campaignId: string,
+    submissionId: string,
+    dto: CreateCommentCommandFromSubmissionDto,
+  ): Promise<CommentCommand> {
+    const response = await apiClient.post<unknown>(
+      `/campaigns/${campaignId}/comment-commands/from-submission/${submissionId}`,
+      dto,
     );
     return toCommentCommand(response.data);
   },

@@ -203,8 +203,13 @@ export default function NewCommandPage() {
                 <SummaryLine label="Status" value={<StatusBadge status={status} type="command" size="sm" />} />
               </div>
               <div className="campaign-summary-panel">
-                <strong>How It Works</strong>
-                {['Admin publishes comment command', 'All campaign Buzzers can see it', 'First Buzzer to Keep locks one comment slot', 'Buzzer submits proof after commenting'].map((item, index) => (
+                <strong>Cara Kerja</strong>
+                {[
+                  'Admin menerbitkan comment command',
+                  'Semua Buzzer member campaign dapat melihatnya',
+                  'Buzzer pertama yang Keep mengunci satu slot komentar',
+                  'Buzzer submit bukti setelah komentar',
+                ].map((item, index) => (
                   <div key={item} className="checklist-item">
                     <span className="section-number" style={{ width: 22, height: 22 }}>{index + 1}</span>
                     <div style={{ gridColumn: 'span 2', fontWeight: 800 }}>{item}</div>

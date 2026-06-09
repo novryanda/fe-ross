@@ -236,13 +236,22 @@ export default function CommandsPage() {
               dengan Keep, first come first served.
             </p>
           </div>
-          <Link
-            href={`/campaigns/${campaignId}/commands/new`}
-            className="btn-primary"
-            style={{ textDecoration: "none" }}
-          >
-            <MessageCircle size={14} /> New Command
-          </Link>
+          <div style={{ display: "flex", gap: "0.65rem", flexWrap: "wrap" }}>
+            <Link
+              href={`/campaigns/${campaignId}/commands/from-pic`}
+              className="btn-secondary"
+              style={{ textDecoration: "none" }}
+            >
+              <MessageCircle size={14} /> From PIC Submission
+            </Link>
+            <Link
+              href={`/campaigns/${campaignId}/commands/new`}
+              className="btn-primary"
+              style={{ textDecoration: "none" }}
+            >
+              <MessageCircle size={14} /> New Command
+            </Link>
+          </div>
         </div>
 
         {commandsQuery.isLoading || campaignQuery.isLoading ? (

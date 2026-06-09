@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { AlertTriangle, CalendarDays, CheckCircle2, Circle, FileText, Flag, Info, Save, Shield, Users, X } from 'lucide-react'
+import { AlertTriangle, CalendarDays, CheckCircle2, Circle, Flag, Info, Save, Shield, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
@@ -8,7 +8,6 @@ import type { CampaignStatus, Platform } from '@/types'
 import {
   CampaignSummaryCard,
   CompletionChecklistCard,
-  MemberGroup,
   MOCK_MEMBERS,
   PLATFORM_OPTIONS,
   SectionHeader,
@@ -16,12 +15,11 @@ import {
   type MockMember,
 } from '@/components/features/campaign/enterprise-campaign-form'
 import { AddCampaignMemberModal } from './add-campaign-member-modal'
-import { Plus } from 'lucide-react'
+import { CampaignMembersSection } from './campaign-members-section'
 
 export interface EnterpriseCampaignEditPayload {
   name: string
   description?: string
-  objective: string
   startDate: string
   endDate: string
   platforms: Platform[]
@@ -29,9 +27,9 @@ export interface EnterpriseCampaignEditPayload {
   members: {
     adminIds: string[]
     buzzerIds: string[]
+    picIds: string[]
     viewerIds: string[]
   }
-  internalNotes?: string
 }
 
 interface EnterpriseCampaignEditFormProps {
@@ -57,12 +55,11 @@ function normalizePayload(data: EnterpriseCampaignEditPayload) {
     ...data,
     name: data.name.trim(),
     description: data.description?.trim() || undefined,
-    objective: data.objective.trim(),
-    internalNotes: data.internalNotes?.trim() || undefined,
     platforms: [...data.platforms].sort(),
     members: {
       adminIds: [...data.members.adminIds].sort(),
       buzzerIds: [...data.members.buzzerIds].sort(),
+      picIds: [...data.members.picIds].sort(),
       viewerIds: [...data.members.viewerIds].sort(),
     },
   }
@@ -75,42 +72,40 @@ function makeSignature(data: EnterpriseCampaignEditPayload) {
 export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchive, loading, archiveLoading, availableMembers = MOCK_MEMBERS, membersLoading }: EnterpriseCampaignEditFormProps) {
   const [name, setName] = useState(initial.name)
   const [description, setDescription] = useState(initial.description ?? '')
-  const [objective, setObjective] = useState(initial.objective)
   const [startDate, setStartDate] = useState(initial.startDate)
   const [endDate, setEndDate] = useState(initial.endDate)
   const [platforms, setPlatforms] = useState<Platform[]>(initial.platforms)
   const [status, setStatus] = useState<CampaignStatus>(initial.status)
   const [adminIds, setAdminIds] = useState<string[]>(initial.members.adminIds)
   const [buzzerIds, setBuzzerIds] = useState<string[]>(initial.members.buzzerIds)
+  const [picIds, setPicIds] = useState<string[]>(initial.members.picIds)
   const [viewerIds, setViewerIds] = useState<string[]>(initial.members.viewerIds)
-  const [notes, setNotes] = useState(initial.internalNotes ?? '')
   const [isMemberModalOpen, setIsMemberModalOpen] = useState(false)
 
   const admins = availableMembers.filter(user => user.role === 'ADMIN')
   const buzzers = availableMembers.filter(user => user.role === 'BUZZER')
+  const pics = availableMembers.filter(user => user.role === 'PIC')
   const viewers = availableMembers.filter(user => user.role === 'VIEWER')
   const selectedAdmins = admins.filter(user => adminIds.includes(user.id))
   const selectedBuzzers = buzzers.filter(user => buzzerIds.includes(user.id))
+  const selectedPics = pics.filter(user => picIds.includes(user.id))
   const selectedViewers = viewers.filter(user => viewerIds.includes(user.id))
   const periodInvalid = Boolean(startDate && endDate && endDate < startDate)
 
   const payload: EnterpriseCampaignEditPayload = {
     name,
     description,
-    objective,
     startDate,
     endDate,
     platforms,
     status,
-    members: { adminIds, buzzerIds, viewerIds },
-    internalNotes: notes,
+    members: { adminIds, buzzerIds, picIds, viewerIds },
   }
 
   const hasChanges = makeSignature(payload) !== makeSignature(initial)
 
   const checklist = useMemo<ChecklistItem[]>(() => [
     { label: 'Campaign name valid', ready: name.trim().length >= 3, emptyLabel: 'Belum valid' },
-    { label: 'Objective (UI-only)', ready: true, emptyLabel: 'Opsional' },
     { label: 'Period valid', ready: Boolean(startDate && endDate && !periodInvalid), emptyLabel: periodInvalid ? 'Tanggal tidak valid' : 'Belum lengkap', invalid: periodInvalid },
     { label: 'Platforms selected', ready: platforms.length > 0, emptyLabel: 'Belum dipilih' },
     { label: 'Admin members', ready: true, emptyLabel: 'Opsional' },
@@ -135,6 +130,7 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
   const handleConfirmMembers = (users: MockMember[]) => {
     setAdminIds(users.filter(u => u.role === 'ADMIN').map(u => u.id))
     setBuzzerIds(users.filter(u => u.role === 'BUZZER').map(u => u.id))
+    setPicIds(users.filter(u => u.role === 'PIC').map(u => u.id))
     setViewerIds(users.filter(u => u.role === 'VIEWER').map(u => u.id))
   }
 
@@ -151,10 +147,6 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
               <div className="form-group">
                 <label className="form-label">Description <span className="form-label-optional">Optional</span></label>
                 <textarea className="input-field" rows={3} value={description} onChange={event => setDescription(event.target.value)} placeholder="Deskripsi singkat campaign..." style={{ resize: 'vertical' }} />
-              </div>
-              <div className="form-group">
-                <label className="form-label">Objective <span className="required-dot">Required</span></label>
-                <textarea className="input-field" rows={3} value={objective} onChange={event => setObjective(event.target.value)} placeholder="Tujuan utama campaign dan outcome yang ingin dicapai..." style={{ resize: 'vertical' }} required />
               </div>
             </div>
           </section>
@@ -258,55 +250,18 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
           </section>
 
           <section className="campaign-create-section">
-            <SectionHeader 
-              number={5} 
-              title="Campaign Members" 
-              icon={<Users size={15} />} 
-              action={
-                <Button type="button" variant="secondary" size="sm" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={14} />}>
-                  Add Member
-                </Button>
-              }
+            <CampaignMembersSection
+              admins={selectedAdmins}
+              buzzers={selectedBuzzers}
+              pics={selectedPics}
+              viewers={selectedViewers}
+              membersLoading={membersLoading}
+              onAddMember={() => setIsMemberModalOpen(true)}
+              onRemoveAdmin={(id) => setAdminIds(prev => prev.filter(x => x !== id))}
+              onRemoveBuzzer={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))}
+              onRemovePic={(id) => setPicIds(prev => prev.filter(x => x !== id))}
+              onRemoveViewer={(id) => setViewerIds(prev => prev.filter(x => x !== id))}
             />
-            <p className="section-helper-text">Assignment ini berlaku di level Campaign. Blast Link tetap tidak memiliki manual assignment.</p>
-            {membersLoading && <p className="muted-meta">Memuat user aktif...</p>}
-            
-            {(!selectedAdmins.length && !selectedBuzzers.length && !selectedViewers.length) ? (
-              <div style={{ padding: '2.5rem', textAlign: 'center', border: '1px dashed var(--border-subtle)', borderRadius: 12, background: 'var(--bg-surface)' }}>
-                <Users size={32} style={{ color: 'var(--text-muted)', margin: '0 auto 1rem', opacity: 0.5 }} />
-                <p style={{ color: 'var(--text-secondary)', marginBottom: '1.25rem' }}>Belum ada member dipilih. Klik Add Member untuk menambahkan user.</p>
-                <Button type="button" onClick={() => setIsMemberModalOpen(true)} icon={<Plus size={16} />}>Add Member</Button>
-              </div>
-            ) : (
-              <div className="member-summary-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))', gap: '1.5rem' }}>
-                <MemberGroup 
-                  title="ADMIN" 
-                  users={selectedAdmins} 
-                  required 
-                  onRemove={(id) => setAdminIds(prev => prev.filter(x => x !== id))} 
-                />
-                <MemberGroup 
-                  title="BUZZERS" 
-                  users={selectedBuzzers} 
-                  required={status === 'ACTIVE'} 
-                  onRemove={(id) => setBuzzerIds(prev => prev.filter(x => x !== id))} 
-                />
-                <MemberGroup 
-                  title="VIEWERS" 
-                  users={selectedViewers} 
-                  onRemove={(id) => setViewerIds(prev => prev.filter(x => x !== id))} 
-                />
-              </div>
-            )}
-          </section>
-
-          <section className="campaign-create-section">
-            <SectionHeader number={6} title="Notes" icon={<FileText size={15} />} />
-            <div className="form-group">
-              <label className="form-label">Internal Notes <span className="form-label-optional">Optional</span></label>
-              <textarea className="input-field" rows={4} value={notes} onChange={event => setNotes(event.target.value.slice(0, 500))} placeholder="Catatan internal untuk tim campaign..." style={{ resize: 'vertical' }} />
-              <span className="form-hint">{notes.length}/500 characters</span>
-            </div>
           </section>
 
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '1rem', marginTop: '1rem', paddingTop: '1rem', borderTop: '1px solid var(--border-subtle)' }}>
@@ -320,14 +275,13 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
         <CampaignSummaryCard
           title="Current Campaign Summary"
           name={summaryText(name)}
-          objective={summaryText(objective)}
           period={startDate || endDate ? `${startDate || '-'} - ${endDate || '-'}` : 'Belum diisi'}
           platforms={platforms}
           status={status}
           adminCount={adminIds.length}
           buzzerCount={buzzerIds.length}
+          picCount={picIds.length}
           viewerCount={viewerIds.length}
-          notes={notes.trim() || 'Belum diisi'}
         />
         <CompletionChecklistCard
           title="Validation Checklist"
@@ -354,7 +308,7 @@ export function EnterpriseCampaignEditForm({ initial, onCancel, onSave, onArchiv
         open={isMemberModalOpen}
         onOpenChange={setIsMemberModalOpen}
         availableMembers={availableMembers}
-        selectedUserIds={[...adminIds, ...buzzerIds, ...viewerIds]}
+        selectedUserIds={[...adminIds, ...buzzerIds, ...picIds, ...viewerIds]}
         onConfirm={handleConfirmMembers}
       />
     </div>

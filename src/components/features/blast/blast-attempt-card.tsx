@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import type { BlastAttempt } from '@/types'
 import { getAttemptStatusConfig, getPlatformLabel, formatRelativeTime } from '@/lib/utils'
 import { useCountdown } from '@/hooks/use-countdown'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { Clock, ExternalLink, Zap } from 'lucide-react'
 
 interface BlastAttemptCardProps {
@@ -43,7 +44,11 @@ export function BlastAttemptCard({ attempt, onKeep, keepLoading, showAction = tr
           <span style={{ padding: '0.125rem 0.5rem', borderRadius: 99, fontSize: '0.65rem', fontWeight: 600, color: sc.color, background: sc.bg }}>{sc.label}</span>
         </div>
         
-        {sa && <div style={{ fontSize: '1.25rem', fontWeight: 600, color: 'var(--text-primary)', marginBottom: '0.25rem' }}>@{sa.username}</div>}
+        {sa && (
+          <div style={{ marginBottom: '0.25rem' }}>
+            <SocialAccountUsernameLink account={sa} style={{ fontSize: '1.25rem' }} />
+          </div>
+        )}
 
         {target && (
           <a href={target.postUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.75rem', color: 'var(--cyan)', textDecoration: 'none', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>

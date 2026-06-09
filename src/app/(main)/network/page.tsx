@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Activity, AlertCircle, Eye, RadioTower, UserCheck, Users } from 'lucide-react'
 import { PageHeader } from '@/components/ui/page-header'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { ErrorState } from '@/components/ui/error-state'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { RoleBadge } from '@/components/layout/role-badge'
@@ -191,7 +192,7 @@ export default function NetworkPage() {
                         <div style={{ minWidth: 0 }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.25rem' }}>
                             <PlatformBadge platform={account.platform} size="sm" />
-                            <span style={{ color: 'var(--text-primary)', fontWeight: 700 }}>@{account.username}</span>
+                            <SocialAccountUsernameLink account={account} style={{ fontWeight: 700 }} />
                           </div>
                           <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem' }}>
                             {account.displayName ?? '—'} · {account.category}

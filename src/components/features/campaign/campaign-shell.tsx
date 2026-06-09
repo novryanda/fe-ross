@@ -1,6 +1,7 @@
 "use client";
 import Link from "next/link";
 import type { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { useQuery } from "@tanstack/react-query";
 import { FolderKanban, MessageCircle, Settings, Target } from "lucide-react";
 import { CampaignHero } from "@/components/features/campaign/campaign-hero";
@@ -21,7 +22,12 @@ export function CampaignShell({
   children,
   actions,
 }: CampaignShellProps) {
+  const pathname = usePathname();
   const { isAdmin, isViewer } = useAuth();
+  const isCommandsContext = pathname.includes(`/campaigns/${campaignId}/commands`);
+  const fromPicHref = isCommandsContext
+    ? `/campaigns/${campaignId}/commands/from-pic`
+    : `/campaigns/${campaignId}/blast-links/new`;
   const membersCountQuery = useQuery({
     queryKey: ["campaign-members", campaignId, "count"],
     queryFn: () => campaignMembersApi.list(campaignId, { page: 1, limit: 1 }),
@@ -37,11 +43,18 @@ export function CampaignShell({
   const defaultActions = isAdmin ? (
     <>
       <Link
-        href={`/campaigns/${campaignId}/blast-links/new`}
+        href={`/campaigns/${campaignId}/blast-links/create`}
         className="btn-primary"
         style={{ textDecoration: "none" }}
       >
-        <Target size={14} /> Create Blast From PIC
+        <Target size={14} /> Add Blast Link
+      </Link>
+      <Link
+        href={fromPicHref}
+        className="btn-secondary"
+        style={{ textDecoration: "none" }}
+      >
+        <Target size={14} /> From PIC Submission
       </Link>
       <Link
         href={`/campaigns/${campaignId}/commands/new`}

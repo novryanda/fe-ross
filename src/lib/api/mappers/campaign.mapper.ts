@@ -8,24 +8,23 @@ import type {
   User,
 } from "@/types";
 
-export type CampaignMemberRole = "ADMIN" | "BUZZER" | "VIEWER";
+export type CampaignMemberRole = "ADMIN" | "BUZZER" | "PIC" | "VIEWER";
 
 export interface CampaignFormMembers {
   adminIds?: string[];
   buzzerIds?: string[];
+  picIds?: string[];
   viewerIds?: string[];
 }
 
 export interface CampaignWriteForm {
   name: string;
   description?: string;
-  objective?: string;
   startDate: string;
   endDate?: string;
   platforms?: Platform[];
   status?: CampaignStatus;
   members?: CampaignFormMembers;
-  internalNotes?: string;
 }
 
 export interface CampaignWriteDto {
@@ -146,6 +145,20 @@ function optionalCountFrom(raw: RawRecord, key: string): number | undefined {
   return asNullableNumber(count[key]);
 }
 
+function memberCountFromCampaign(value: RawRecord): number | undefined {
+  const direct = asNullableNumber(value.memberCount);
+  if (direct !== undefined) return direct;
+
+  const fromCount = optionalCountFrom(value, "members");
+  if (fromCount !== undefined) return fromCount;
+
+  if (Array.isArray(value.members)) {
+    return value.members.length;
+  }
+
+  return undefined;
+}
+
 function uniquePlatforms(platforms: Platform[]): Platform[] {
   return [...new Set(platforms)];
 }
@@ -229,9 +242,7 @@ export function toCampaign(raw: unknown): Campaign {
     owner: createdBy,
     createdAt: asString(value.createdAt, new Date(0).toISOString()),
     updatedAt: asString(value.updatedAt, new Date(0).toISOString()),
-    memberCount:
-      asNullableNumber(value.memberCount) ??
-      optionalCountFrom(value, "members"),
+    memberCount: memberCountFromCampaign(value),
     blastTargetCount:
       asNullableNumber(value.blastTargetCount) ??
       optionalCountFrom(value, "blastTargets"),
@@ -299,6 +310,10 @@ export function toAddMembersDto(
     ...(formMembers.buzzerIds ?? []).map((userId) => ({
       userId,
       memberRole: "BUZZER" as const,
+    })),
+    ...(formMembers.picIds ?? []).map((userId) => ({
+      userId,
+      memberRole: "PIC" as const,
     })),
     ...(formMembers.viewerIds ?? []).map((userId) => ({
       userId,

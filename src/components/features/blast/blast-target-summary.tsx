@@ -1,5 +1,6 @@
 import { CalendarDays, ExternalLink } from 'lucide-react'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { formatDateTime } from '@/lib/utils'
 import type { BlastAttempt, BlastTarget, Campaign } from '@/types'
 
@@ -12,7 +13,9 @@ export function BlastTargetSummary({ campaign, target, currentAttempt }: { campa
       </div>
       <div className="target-summary-cell">
         <div className="blast-metric-label">Source Account</div>
-        <div style={{ marginTop: '0.35rem', fontWeight: 800 }}>@{target.socialAccount?.username ?? '-'}</div>
+        <div style={{ marginTop: '0.35rem' }}>
+          <SocialAccountUsernameLink account={target.socialAccount} />
+        </div>
         <div className="muted-meta">{target.socialAccount?.displayName ?? campaign?.name ?? 'Campaign source'}</div>
       </div>
       <div className="target-summary-cell">

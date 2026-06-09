@@ -177,6 +177,16 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
           <h2 className="section-title">Campaign Blast Links</h2>
           <p className="section-subtitle">Monitor target posts, current attempts, claims, expiry windows, and reblast needs.</p>
         </div>
+        {isAdmin ? (
+          <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+            <Link href={`/campaigns/${campaignId}/blast-links/create`} className="btn-primary" style={{ textDecoration: 'none' }}>
+              <Target size={14} /> Add Blast Link
+            </Link>
+            <Link href={`/campaigns/${campaignId}/blast-links/new`} className="btn-secondary" style={{ textDecoration: 'none' }}>
+              From PIC Submission
+            </Link>
+          </div>
+        ) : null}
       </div>
 
       <div className="blast-info-banner">
@@ -226,7 +236,16 @@ export function CampaignBlastLinksView({ campaignId }: { campaignId: string }) {
           icon={<Clock3 size={48} />}
           title="Belum ada blast link yang cocok"
           description="Blast link terbuka untuk semua Buzzer yang menjadi member campaign. Tambahkan target post pertama atau ubah filter."
-          action={isAdmin ? <Link href={`/campaigns/${campaignId}/blast-links/new`} className="btn-primary" style={{ textDecoration: 'none' }}>Create From PIC Submission</Link> : undefined}
+          action={isAdmin ? (
+            <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap', justifyContent: 'center' }}>
+              <Link href={`/campaigns/${campaignId}/blast-links/create`} className="btn-primary" style={{ textDecoration: 'none' }}>
+                <Target size={14} /> Add Blast Link
+              </Link>
+              <Link href={`/campaigns/${campaignId}/blast-links/new`} className="btn-secondary" style={{ textDecoration: 'none' }}>
+                From PIC Submission
+              </Link>
+            </div>
+          ) : undefined}
         />
       ) : (
         <BlastLinksTable

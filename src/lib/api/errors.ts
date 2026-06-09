@@ -85,6 +85,12 @@ export function mapApiErrorToToastMessage(error: unknown): string {
       return "Data yang diminta tidak ditemukan.";
     case "VALIDATION_ERROR":
       return error.details[0]?.message ?? "Input tidak valid.";
+    case "ORG_UNIT_HAS_CHILDREN":
+      return "Unit ini masih punya sub unit. Hapus atau pindahkan sub unit dulu.";
+    case "ORG_UNIT_HAS_PIC_USERS":
+      return "Unit ini masih dipakai user PIC. Pindahkan user PIC dulu.";
+    case "ORG_UNIT_HAS_POSTING_ORDERS":
+      return "Unit ini masih dipakai posting order. Pindahkan atau selesaikan dulu.";
     case "CONFLICT":
       return "Terjadi konflik data. Muat ulang halaman lalu coba lagi.";
     case "EXPORT_NOT_FOUND":
@@ -105,6 +111,10 @@ export function mapApiErrorToToastMessage(error: unknown): string {
       return "Export ini tidak dapat di-retry.";
     case "EMAIL_ALREADY_IN_USE":
       return "Email sudah digunakan oleh user lain.";
+    case "RESET_PASSWORD_DISABLED":
+      return "Fitur email reset password belum aktif di server.";
+    case "INVALID_TOKEN":
+      return "Link reset password tidak valid atau sudah kedaluwarsa.";
     case "LAST_ACTIVE_ADMIN":
       return "Tidak bisa menonaktifkan admin aktif terakhir.";
     case "CANNOT_DEACTIVATE_SELF":
@@ -120,6 +130,10 @@ export function mapApiErrorToToastMessage(error: unknown): string {
       return "Konfirmasi password baru tidak cocok.";
     case "PASSWORD_UNCHANGED":
       return "Password baru harus berbeda dari password saat ini.";
+    case "PASSWORD_TOO_SHORT":
+      return "Password baru minimal 8 karakter.";
+    case "PASSWORD_TOO_LONG":
+      return "Password baru terlalu panjang.";
     case "INVALID_PASSWORD":
       return "Password saat ini salah.";
     default:

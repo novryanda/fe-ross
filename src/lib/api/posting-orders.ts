@@ -6,6 +6,7 @@ import type {
   PostingOrder,
   PostingSubmission,
   SocialAccount,
+  Stance,
   User,
 } from "@/types";
 import { apiClient, isMockMode } from "./client";
@@ -91,18 +92,21 @@ function fallbackMeta(page?: number, limit?: number, total = 0): PaginationMeta 
 export interface PostingOrderListParams {
   page?: number;
   limit?: number;
+  campaignId?: string;
   status?: PostingOrder["status"] | "";
   submissionStatus?: PostingSubmission["status"] | "";
   platform?: Platform | "";
   targetUnitId?: string;
   search?: string;
   eligibleForBlast?: boolean;
+  eligibleForComment?: boolean;
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
 
 export interface CreatePostingOrderDto {
   targetUnitId: string;
+  title: string;
   platform: Platform;
   contentDriveUrl: string;
   scheduledAt: string;
@@ -126,9 +130,20 @@ export interface ReviewPostingSubmissionDto {
   reviewNotes?: string;
 }
 
+export interface CreateCommentCommandFromSubmissionDto {
+  stance: Stance;
+  narrative: string;
+  instruction?: string;
+  requiredSlots: number;
+  keepExpiryMinutes?: number;
+  deadline: string;
+  status?: "DRAFT" | "ACTIVE";
+}
+
 function toPostingSubmission(value: unknown): PostingSubmission {
   const raw = asRecord(value);
   const blastTarget = asRecord(raw.blastTarget);
+  const commentCommand = asRecord(raw.commentCommand);
   return {
     id: asString(raw.id),
     postingOrderId: asString(raw.postingOrderId),
@@ -150,6 +165,7 @@ function toPostingSubmission(value: unknown): PostingSubmission {
     createdAt: asString(raw.createdAt),
     updatedAt: asString(raw.updatedAt),
     blastTargetId: asOptionalString(blastTarget.id),
+    commentCommandId: asOptionalString(commentCommand.id),
   };
 }
 
@@ -168,6 +184,7 @@ function toPostingOrder(value: unknown): PostingOrder {
       : undefined,
     targetUnitId: asString(raw.targetUnitId ?? asRecord(raw.targetUnit).id),
     targetUnit: toOrgUnit(raw.targetUnit),
+    title: asString(raw.title),
     platform: asString(raw.platform, "INSTAGRAM") as Platform,
     contentDriveUrl: asString(raw.contentDriveUrl),
     scheduledAt: asString(raw.scheduledAt),
@@ -183,11 +200,34 @@ function toPostingOrder(value: unknown): PostingOrder {
     completedAt: asOptionalString(raw.completedAt),
     createdAt: asString(raw.createdAt),
     updatedAt: asString(raw.updatedAt),
-    submission: raw.submission ? toPostingSubmission(raw.submission) : undefined,
+    submissionCount:
+      typeof asRecord(raw._count).submissions === "number"
+        ? (asRecord(raw._count).submissions as number)
+        : undefined,
   };
 }
 
 export const postingOrdersApi = {
+  async listOrders(
+    params: PostingOrderListParams = {},
+  ): Promise<{ data: PostingOrder[]; meta: PaginationMeta }> {
+    const response = await apiClient.get<unknown[]>("/posting-orders", {
+      page: params.page,
+      limit: params.limit,
+      campaignId: params.campaignId,
+      status: params.status || undefined,
+      platform: params.platform || undefined,
+      targetUnitId: params.targetUnitId,
+      search: params.search,
+      sortBy: params.sortBy,
+      sortOrder: params.sortOrder,
+    });
+    return {
+      data: response.data.map(toPostingOrder),
+      meta: response.meta ?? fallbackMeta(params.page, params.limit, response.data.length),
+    };
+  },
+
   async listCampaignOrders(
     campaignId: string,
     params: PostingOrderListParams = {},
@@ -297,6 +337,7 @@ export const postingOrdersApi = {
         platform: params.platform || undefined,
         submissionStatus: params.submissionStatus || undefined,
         eligibleForBlast: params.eligibleForBlast ? true : undefined,
+        eligibleForComment: params.eligibleForComment ? true : undefined,
         sortOrder: params.sortOrder,
       },
     );
@@ -323,6 +364,18 @@ export const postingOrdersApi = {
   ) {
     const response = await apiClient.post<unknown>(
       `/campaigns/${campaignId}/blast-targets/from-submission/${submissionId}`,
+    );
+    return response.data;
+  },
+
+  async createCommentFromSubmission(
+    campaignId: string,
+    submissionId: string,
+    dto: CreateCommentCommandFromSubmissionDto,
+  ) {
+    const response = await apiClient.post<unknown>(
+      `/campaigns/${campaignId}/comment-commands/from-submission/${submissionId}`,
+      dto,
     );
     return response.data;
   },

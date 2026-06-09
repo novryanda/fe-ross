@@ -65,6 +65,7 @@ export function AddCampaignMemberModal({
   const getRoleColor = (role: string) => {
     if (role === 'ADMIN') return 'var(--cyan)'
     if (role === 'BUZZER') return '#8b5cf6'
+    if (role === 'PIC') return 'var(--status-expired)'
     return '#39ff14' // VIEWER
   }
 
@@ -117,6 +118,7 @@ export function AddCampaignMemberModal({
               <option value="ALL">All Roles</option>
               <option value="ADMIN">Admin</option>
               <option value="BUZZER">Buzzer</option>
+              <option value="PIC">PIC</option>
               <option value="VIEWER">Viewer</option>
             </select>
           </div>

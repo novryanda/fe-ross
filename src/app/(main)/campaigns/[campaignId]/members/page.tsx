@@ -41,7 +41,6 @@ export default function CampaignMembersPage() {
   const selectableUsers = (usersQuery.data?.items ?? []).filter(
     (user) =>
       user.status === "ACTIVE" &&
-      user.role !== "PIC" &&
       !existingUserIds.has(user.id),
   );
   const selectedUser = selectableUsers.find(
@@ -51,9 +50,6 @@ export default function CampaignMembersPage() {
   const addMutation = useMutation({
     mutationFn: () => {
       if (!selectedUser) throw new Error("Pilih user aktif terlebih dahulu.");
-      if (selectedUser.role === "PIC") {
-        throw new Error("Role PIC tidak bisa menjadi campaign member.");
-      }
       return campaignMembersApi.add(campaignId, {
         members: [
           {

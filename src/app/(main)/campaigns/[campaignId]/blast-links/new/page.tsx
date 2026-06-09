@@ -9,6 +9,7 @@ import { RoleGuard } from '@/components/layout/role-guard'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { PlatformBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { campaignsApi } from '@/lib/api/campaigns'
 import { postingOrdersApi } from '@/lib/api/posting-orders'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
@@ -108,7 +109,9 @@ export default function NewBlastLinkPage() {
                       {submission.submittedByUser?.name ?? submission.submittedById}
                     </div>
                     <div className="muted-meta">
-                      {submission.socialAccount ? `@${submission.socialAccount.username}` : submission.socialAccountId}
+                      {submission.socialAccount
+                        ? <SocialAccountUsernameLink account={submission.socialAccount} style={{ fontWeight: 700 }} />
+                        : submission.socialAccountId}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

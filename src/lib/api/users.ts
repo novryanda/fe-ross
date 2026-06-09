@@ -56,6 +56,7 @@ export interface CreateUserDto {
   status?: UserStatus;
   picUnitId?: string;
   campaignIds?: string[];
+  sendInviteEmail?: boolean;
   temporaryPassword?: string;
   requirePasswordChange?: boolean;
   notes?: string;
@@ -74,13 +75,16 @@ export interface UpdateUserStatusDto {
 }
 
 export interface AdminResetPasswordDto {
-  newPassword: string;
+  newPassword?: string;
+  sendResetEmail?: boolean;
   revokeSessions?: boolean;
   requirePasswordChange?: boolean;
 }
 
 export interface AdminResetPasswordResponse {
   success: boolean;
+  mode?: "manual_password" | "email_link";
+  emailSent?: boolean;
   revokeSessions: boolean;
   requirePasswordChange: boolean | "NEEDS_AUTH_PROVIDER_SUPPORT";
 }
@@ -95,6 +99,12 @@ export interface UserMembershipView {
 export interface UserDetail extends UserSummary {
   picUnit?: Pick<OrgUnit, "id" | "name" | "code" | "status" | "parentId">;
   campaignMemberships: UserMembershipView[];
+}
+
+export interface CreateUserResult extends UserSummary {
+  inviteRequested?: boolean;
+  inviteEmailSent?: boolean;
+  requirePasswordChange?: boolean | "NEEDS_AUTH_PROVIDER_SUPPORT";
 }
 
 // ---------- Public API ----------
@@ -208,7 +218,7 @@ export const usersApi = {
     };
   },
 
-  async create(dto: CreateUserDto): Promise<UserSummary> {
+  async create(dto: CreateUserDto): Promise<CreateUserResult> {
     if (isMockMode()) {
       await delay(MOCK_LATENCY_MS);
       const existing = mockUsers.find(
@@ -230,7 +240,7 @@ export const usersApi = {
       return toUserSummary(newUser, dto.campaignIds?.length ?? 0);
     }
 
-    const response = await apiClient.post<UserSummary>("/users", dto);
+    const response = await apiClient.post<CreateUserResult>("/users", dto);
     return response.data;
   },
 

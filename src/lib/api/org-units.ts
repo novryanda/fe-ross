@@ -1,5 +1,12 @@
-import type { OrgUnit, PaginationMeta } from "@/types";
-import { apiClient, isMockMode } from "./client";
+import type {
+  OrgUnit,
+  OrgUnitDetail,
+  OrgUnitMemberSummary,
+  PaginationMeta,
+  UserRole,
+  UserStatus,
+} from "@/types";
+import { API_BASE_URL, apiClient, isMockMode } from "./client";
 
 function delay(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -45,9 +52,43 @@ function toOrgUnit(value: unknown): OrgUnit {
       : undefined,
     createdAt: asString(raw.createdAt),
     updatedAt: asString(raw.updatedAt),
-    memberCount: asNumber(count.members),
-    childCount: asNumber(count.children),
-    postingOrderCount: asNumber(count.postingOrders),
+    level: asNumber(raw.level),
+    memberCount: asNumber(raw.memberCount) ?? asNumber(count.members),
+    childCount: asNumber(raw.childCount) ?? asNumber(count.children),
+    postingOrderCount:
+      asNumber(raw.postingOrderCount) ?? asNumber(count.postingOrders),
+  };
+}
+
+function toOrgUnitDetail(value: unknown): OrgUnitDetail {
+  const raw = asRecord(value);
+  const ancestors = Array.isArray(raw.ancestors)
+    ? raw.ancestors.map((item) => {
+        const ancestor = asRecord(item);
+        return {
+          id: asString(ancestor.id),
+          name: asString(ancestor.name),
+          code: typeof ancestor.code === "string" ? ancestor.code : undefined,
+        };
+      })
+    : undefined;
+  const members: OrgUnitMemberSummary[] | undefined = Array.isArray(raw.members)
+    ? raw.members.map((item) => {
+        const member = asRecord(item);
+        return {
+          id: asString(member.id),
+          name: asString(member.name),
+          email: asString(member.email),
+          status: asString(member.status, "ACTIVE") as UserStatus,
+          role: asString(member.role, "PIC") as UserRole,
+        };
+      })
+    : undefined;
+
+  return {
+    ...toOrgUnit(raw),
+    ancestors,
+    members,
   };
 }
 
@@ -67,6 +108,9 @@ export interface OrgUnitListParams {
   limit?: number;
   status?: OrgUnit["status"] | "";
   search?: string;
+  level?: number | "";
+  picAssigned?: "ASSIGNED" | "UNASSIGNED" | "";
+  view?: "flat" | "tree";
   sortBy?: string;
   sortOrder?: "asc" | "desc";
 }
@@ -76,6 +120,21 @@ export interface OrgUnitWriteDto {
   code?: string;
   parentId?: string;
   status?: OrgUnit["status"];
+}
+
+export interface OrgUnitMoveDto {
+  parentId?: string | null;
+}
+
+function buildQueryString(params?: OrgUnitListParams): string {
+  if (!params) return "";
+  const searchParams = new URLSearchParams();
+  for (const [key, value] of Object.entries(params)) {
+    if (value === undefined || value === null || value === "") continue;
+    searchParams.append(key, String(value));
+  }
+  const query = searchParams.toString();
+  return query ? `?${query}` : "";
 }
 
 export const orgUnitsApi = {
@@ -92,6 +151,9 @@ export const orgUnitsApi = {
       limit: params.limit,
       status: params.status || undefined,
       search: params.search,
+      level: params.level || undefined,
+      picAssigned: params.picAssigned || undefined,
+      view: params.view,
       sortBy: params.sortBy,
       sortOrder: params.sortOrder,
     });
@@ -99,6 +161,11 @@ export const orgUnitsApi = {
       data: response.data.map(toOrgUnit),
       meta: response.meta ?? fallbackMeta(params.page, params.limit, response.data.length),
     };
+  },
+
+  async getById(id: string): Promise<OrgUnitDetail> {
+    const response = await apiClient.get<unknown>(`/org-units/${id}`);
+    return toOrgUnitDetail(response.data);
   },
 
   async create(dto: OrgUnitWriteDto): Promise<OrgUnit> {
@@ -109,5 +176,38 @@ export const orgUnitsApi = {
   async update(id: string, dto: Partial<OrgUnitWriteDto>): Promise<OrgUnit> {
     const response = await apiClient.patch<unknown>(`/org-units/${id}`, dto);
     return toOrgUnit(response.data);
+  },
+
+  async move(id: string, dto: OrgUnitMoveDto): Promise<OrgUnit> {
+    const response = await apiClient.patch<unknown>(`/org-units/${id}/move`, dto);
+    return toOrgUnit(response.data);
+  },
+
+  async delete(id: string): Promise<void> {
+    if (isMockMode()) {
+      await delay(150);
+      return;
+    }
+
+    await apiClient.delete<unknown>(`/org-units/${id}`);
+  },
+
+  async exportCsv(params: OrgUnitListParams = {}): Promise<Blob> {
+    const response = await fetch(
+      `${API_BASE_URL}/org-units/export${buildQueryString(params)}`,
+      {
+        method: "GET",
+        credentials: "include",
+        headers: {
+          Accept: "text/csv",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error("Gagal mengekspor data PIC structure.");
+    }
+
+    return response.blob();
   },
 };

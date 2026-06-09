@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { AlertTriangle, Archive, CheckCircle2, Clock, ExternalLink, MessageCircle, Pause, Play, ShieldCheck, TimerReset, Users } from 'lucide-react'
 import { PlatformBadge, StanceBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { EmptyState } from '@/components/ui/empty-state'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { CampaignShell } from '@/components/features/campaign/campaign-shell'
@@ -72,7 +73,7 @@ export default function CommandDetailPage() {
                   </div>
                   <div className="summary-line"><div className="summary-label">Campaign</div><div className="summary-value">{campaignQuery.data?.name ?? command.campaign?.name ?? '-'}</div></div>
                   <div className="summary-line"><div className="summary-label">Target URL</div><div className="summary-value"><a href={command.targetPostUrl} target="_blank" rel="noopener noreferrer" className="ext-link">{command.targetPostUrl} <ExternalLink size={10} /></a></div></div>
-                  <div className="summary-line"><div className="summary-label">Source Account</div><div className="summary-value">{command.socialAccount?.username ? `@${command.socialAccount.username}` : '-'}</div></div>
+                  <div className="summary-line"><div className="summary-label">Source Account</div><div className="summary-value"><SocialAccountUsernameLink account={command.socialAccount} /></div></div>
                   <div className="summary-line"><div className="summary-label">Deadline</div><div className="summary-value">{command.deadline ? formatDate(command.deadline) : '-'}</div></div>
                   <div className="summary-line"><div className="summary-label">Keep Expiry</div><div className="summary-value">{command.keepExpiryMinutes} minutes</div></div>
                 </section>

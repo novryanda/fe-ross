@@ -73,9 +73,23 @@ export interface OrgUnit {
   parent?: Pick<OrgUnit, "id" | "name" | "code" | "status">;
   createdAt: string;
   updatedAt: string;
+  level?: number;
   memberCount?: number;
   childCount?: number;
   postingOrderCount?: number;
+}
+
+export interface OrgUnitMemberSummary {
+  id: string;
+  name: string;
+  email: string;
+  status: UserStatus;
+  role: UserRole;
+}
+
+export interface OrgUnitDetail extends OrgUnit {
+  ancestors?: Array<Pick<OrgUnit, "id" | "name" | "code">>;
+  members?: OrgUnitMemberSummary[];
 }
 
 // --- Campaign ---
@@ -197,6 +211,7 @@ export interface CommentCommand {
   id: string;
   campaignId: string;
   campaign?: Campaign;
+  sourcePostingSubmissionId?: string;
   socialAccountId?: string;
   socialAccount?: SocialAccount;
   targetPostUrl: string;
@@ -301,6 +316,7 @@ export interface PostingOrder {
   campaign?: Pick<Campaign, "id" | "name" | "status">;
   targetUnitId: string;
   targetUnit?: OrgUnit;
+  title: string;
   platform: Platform;
   contentDriveUrl: string;
   scheduledAt: string;
@@ -315,7 +331,7 @@ export interface PostingOrder {
   completedAt?: string;
   createdAt: string;
   updatedAt: string;
-  submission?: PostingSubmission;
+  submissionCount?: number;
 }
 
 export interface PostingSubmission {
@@ -338,6 +354,7 @@ export interface PostingSubmission {
   createdAt: string;
   updatedAt: string;
   blastTargetId?: string;
+  commentCommandId?: string;
 }
 
 // --- Dashboard ---

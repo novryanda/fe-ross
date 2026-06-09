@@ -11,8 +11,10 @@ import { ErrorState } from '@/components/ui/error-state'
 import { Modal } from '@/components/ui/modal'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
 import { SocialAccountFormComponent } from '@/components/features/social-account/social-account-form'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { socialAccountsApi } from '@/lib/api/social-accounts'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
+import { formatDate } from '@/lib/utils'
 import { PLATFORMS, SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
 import type { SocialAccountForm } from '@/lib/validations'
 import type { Platform, SocialAccount, SocialAccountCategory, SocialAccountStatus } from '@/types'
@@ -126,10 +128,12 @@ export default function PicSocialAccountsPage() {
         />
 
         {accountsQuery.isLoading ? (
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            {Array.from({ length: 4 }).map((_, index) => (
-              <div key={index} className="skeleton" style={{ height: 84, borderRadius: 16 }} />
-            ))}
+          <div className="data-table-container" aria-busy="true">
+            <div style={{ padding: '1.5rem' }}>
+              {Array.from({ length: 5 }).map((_, index) => (
+                <div key={index} className="skeleton" style={{ height: 28, marginBottom: '0.75rem' }} />
+              ))}
+            </div>
           </div>
         ) : accountsQuery.isError ? (
           <ErrorState
@@ -145,48 +149,74 @@ export default function PicSocialAccountsPage() {
             action={<button type="button" className="btn-primary" onClick={() => setIsModalOpen(true)}>Add Account</button>}
           />
         ) : (
-          <div style={{ display: 'grid', gap: '0.85rem' }}>
-            {accounts.map((account) => (
-              <article key={account.id} className="card" style={{ padding: '1rem', display: 'grid', gap: '0.65rem' }}>
-                <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                  <div>
-                    <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                      <PlatformBadge platform={account.platform as Platform} size="sm" />
-                      <StatusBadge type="social" status={account.status as SocialAccountStatus} size="sm" />
-                    </div>
-                    <div style={{ fontWeight: 900, color: 'var(--text-primary)', marginTop: '0.5rem' }}>
-                      @{account.username}
-                    </div>
-                    <div className="muted-meta">{account.displayName ?? '-'} / {account.category as SocialAccountCategory}</div>
-                  </div>
-                  <a href={account.profileUrl} target="_blank" rel="noreferrer" className="btn-ghost" style={{ textDecoration: 'none' }}>
-                    Open Profile
-                  </a>
-                </div>
-
-                <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-                  <button
-                    type="button"
-                    className="btn-secondary"
-                    onClick={() => {
-                      setEditingAccount(account)
-                      setIsModalOpen(true)
-                    }}
-                  >
-                    <Edit2 size={14} /> Edit
-                  </button>
-                  {account.status === 'ARCHIVED' ? (
-                    <button type="button" className="btn-ghost" onClick={() => statusMutation.mutate({ id: account.id, status: 'ACTIVE' })}>
-                      <RotateCcw size={14} /> Restore
-                    </button>
-                  ) : (
-                    <button type="button" className="btn-danger" onClick={() => statusMutation.mutate({ id: account.id, status: 'ARCHIVED' })}>
-                      <Archive size={14} /> Archive
-                    </button>
-                  )}
-                </div>
-              </article>
-            ))}
+          <div className="data-table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Platform</th>
+                  <th>Username</th>
+                  <th>Display Name</th>
+                  <th>Category</th>
+                  <th>Status</th>
+                  <th>Created</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {accounts.map((account) => (
+                  <tr key={account.id}>
+                    <td><PlatformBadge platform={account.platform as Platform} size="sm" /></td>
+                    <td>
+                      <SocialAccountUsernameLink account={account} />
+                    </td>
+                    <td style={{ color: 'var(--text-secondary)' }}>{account.displayName ?? '-'}</td>
+                    <td>
+                      <span className="selected-chip">{account.category as SocialAccountCategory}</span>
+                    </td>
+                    <td><StatusBadge type="social" status={account.status as SocialAccountStatus} size="sm" /></td>
+                    <td style={{ color: 'var(--text-muted)' }}>{formatDate(account.createdAt)}</td>
+                    <td>
+                      <div className="action-row" style={{ justifyContent: 'flex-start' }}>
+                        <button
+                          type="button"
+                          className="icon-action"
+                          onClick={() => {
+                            setEditingAccount(account)
+                            setIsModalOpen(true)
+                          }}
+                        >
+                          <Edit2 size={13} /> Edit
+                        </button>
+                        {account.status === 'ARCHIVED' ? (
+                          <button
+                            type="button"
+                            className="icon-action"
+                            disabled={statusMutation.isPending && statusMutation.variables?.id === account.id}
+                            onClick={() => statusMutation.mutate({ id: account.id, status: 'ACTIVE' })}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.id === account.id ? <span className="spinner" /> : <RotateCcw size={13} />}
+                            Restore
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="icon-action danger"
+                            disabled={statusMutation.isPending && statusMutation.variables?.id === account.id}
+                            onClick={() => statusMutation.mutate({ id: account.id, status: 'ARCHIVED' })}
+                          >
+                            {statusMutation.isPending && statusMutation.variables?.id === account.id ? <span className="spinner" /> : <Archive size={13} />}
+                            Archive
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div className="pagination-footer">
+              <span>Showing {accounts.length} social account{accounts.length === 1 ? '' : 's'}</span>
+            </div>
           </div>
         )}
 

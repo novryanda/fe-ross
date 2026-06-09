@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { blastApi } from '@/lib/api/blast'
 import { useAuthStore } from '@/stores/auth-store'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { EmptyState } from '@/components/ui/empty-state'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { formatDate } from '@/lib/utils'
@@ -116,9 +117,10 @@ export default function BlastQueuePage() {
                     {attempt.blastTarget && <PlatformBadge platform={attempt.blastTarget.platform} size="sm" />}
                   </td>
                   <td>
-                    <div style={{ fontSize: '0.8125rem', color: 'var(--text-secondary)' }}>
-                      @{attempt.blastTarget?.socialAccount?.username ?? '—'}
-                    </div>
+                    <SocialAccountUsernameLink
+                      account={attempt.blastTarget?.socialAccount}
+                      style={{ fontSize: '0.8125rem', fontWeight: 500 }}
+                    />
                   </td>
                   <td>
                     <a

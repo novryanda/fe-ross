@@ -10,6 +10,7 @@ import { DataFilters } from '@/components/ui/data-filters'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
 import { PlatformBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { postingOrdersApi } from '@/lib/api/posting-orders'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
 import { formatDateTime } from '@/lib/utils'
@@ -140,7 +141,9 @@ export default function PicMySubmissionsPage() {
                       {submission.postingOrder?.campaign?.name ?? 'Campaign'}
                     </div>
                     <div className="muted-meta">
-                      {submission.socialAccount ? `@${submission.socialAccount.username}` : submission.socialAccountId}
+                      {submission.socialAccount
+                        ? <SocialAccountUsernameLink account={submission.socialAccount} style={{ fontWeight: 700 }} />
+                        : submission.socialAccountId}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>

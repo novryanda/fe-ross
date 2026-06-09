@@ -1,6 +1,7 @@
 import type { SocialAccount } from '@/types'
 import { getPlatformLabel } from '@/lib/utils'
-import { ExternalLink, Target } from 'lucide-react'
+import { Target } from 'lucide-react'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 
 export function SocialAccountCard({ account, onEdit, onDelete }: { account: SocialAccount; onEdit?: () => void; onDelete?: () => void }) {
   return (
@@ -15,7 +16,7 @@ export function SocialAccountCard({ account, onEdit, onDelete }: { account: Soci
               {account.status}
             </span>
           </div>
-          <div style={{ fontSize: '0.9375rem', fontWeight: 600, color: 'var(--text-primary)' }}>@{account.username}</div>
+          <SocialAccountUsernameLink account={account} style={{ fontSize: '0.9375rem', fontWeight: 600 }} />
           {account.displayName && <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)' }}>{account.displayName}</div>}
         </div>
         <div style={{ display: 'flex', gap: '0.375rem' }}>
@@ -26,9 +27,6 @@ export function SocialAccountCard({ account, onEdit, onDelete }: { account: Soci
       <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
         <span style={{ display: 'flex', alignItems: 'center', gap: '0.25rem' }}><Target size={11} /> {account.blastTargetCount ?? 0} targets</span>
         <span style={{ padding: '0.1rem 0.375rem', background: 'var(--bg-primary)', borderRadius: 4, fontSize: '0.65rem' }}>{account.category}</span>
-        <a href={account.profileUrl} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--cyan)', textDecoration: 'none' }}>
-          <ExternalLink size={10} /> Profile
-        </a>
       </div>
     </div>
   )

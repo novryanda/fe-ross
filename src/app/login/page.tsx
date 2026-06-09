@@ -57,6 +57,7 @@ function LoginForm() {
   const reasonMessage = useMemo(() => {
     const reason = searchParams.get('reason')
     if (reason === 'password_changed') return 'Password berhasil diubah. Silakan login dengan password baru.'
+    if (reason === 'password_reset') return 'Password berhasil dibuat atau direset. Silakan login.'
     return null
   }, [searchParams])
 
@@ -211,7 +212,7 @@ function LoginForm() {
                 <span className="check-box" />
                 Maintain session
               </label>
-              <a href="#" className="clearance-link">Request Clearance</a>
+              <a href="/forgot-password" className="clearance-link">Forgot password?</a>
             </div>
 
             {error && (

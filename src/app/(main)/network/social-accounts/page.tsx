@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Archive, Edit2, ExternalLink, Eye, Facebook, Globe, Info, Instagram, Music2, Plus, RadioTower, RotateCcw } from 'lucide-react'
+import { Archive, Edit2, Eye, Facebook, Globe, Info, Instagram, Music2, Plus, RadioTower, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 import { PageHeader } from '@/components/ui/page-header'
 import { DataFilters } from '@/components/ui/data-filters'
@@ -13,6 +13,7 @@ import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
 import { Modal } from '@/components/ui/modal'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { SocialAccountFormComponent } from '@/components/features/social-account/social-account-form'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { PLATFORMS, SOCIAL_ACCOUNT_CATEGORIES } from '@/lib/constants'
 import { socialAccountsApi } from '@/lib/api/social-accounts'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
@@ -210,10 +211,7 @@ export default function SocialAccountsPage() {
                   <tr key={account.id}>
                     <td><PlatformBadge platform={account.platform as Platform} size="sm" /></td>
                     <td>
-                      <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>@{account.username}</div>
-                      <a href={account.profileUrl} target="_blank" rel="noreferrer" className="ext-link">
-                        <ExternalLink size={12} /> Open profile
-                      </a>
+                      <SocialAccountUsernameLink account={account} />
                     </td>
                     <td style={{ color: 'var(--text-secondary)' }}>{account.displayName ?? '-'}</td>
                     <td>

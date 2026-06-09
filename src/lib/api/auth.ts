@@ -76,6 +76,15 @@ function toUiUser(data: MeEnvelopeData): User {
   };
 }
 
+interface PasswordResetRequestResult {
+  status: boolean;
+  message: string;
+}
+
+interface PasswordResetResult {
+  status: boolean;
+}
+
 // ---------- Public API ----------
 
 export const authApi = {
@@ -145,5 +154,51 @@ export const authApi = {
       }
       throw error;
     }
+  },
+
+  async requestPasswordReset(
+    email: string,
+    redirectTo?: string,
+  ): Promise<PasswordResetRequestResult> {
+    if (isMockMode()) {
+      await delay(MOCK_LATENCY_MS);
+      return {
+        status: true,
+        message:
+          "Jika email terdaftar, link reset password akan dikirim.",
+      };
+    }
+
+    return apiClient.fetchFromOrigin<PasswordResetRequestResult>(
+      "/api/auth/request-password-reset",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          email,
+          ...(redirectTo ? { redirectTo } : {}),
+        }),
+      },
+    );
+  },
+
+  async resetPassword(
+    token: string,
+    newPassword: string,
+  ): Promise<PasswordResetResult> {
+    if (isMockMode()) {
+      await delay(MOCK_LATENCY_MS);
+      return { status: true };
+    }
+
+    return apiClient.fetchFromOrigin<PasswordResetResult>(
+      "/api/auth/reset-password",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          token,
+          newPassword,
+        }),
+      },
+    );
   },
 };

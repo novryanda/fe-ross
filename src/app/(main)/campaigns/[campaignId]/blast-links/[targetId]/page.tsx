@@ -27,6 +27,7 @@ import { BlastMetricCard } from "@/components/features/blast/blast-metric-card";
 import { BlastTargetSummary } from "@/components/features/blast/blast-target-summary";
 import { AttemptHistoryTable } from "@/components/features/blast/attempt-history-table";
 import { PlatformBadge, StatusBadge } from "@/components/ui/badges";
+import { SocialAccountUsernameLink } from "@/components/features/social-account/social-account-username-link";
 import { Button } from "@/components/ui/button";
 import { Modal } from "@/components/ui/modal";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -584,8 +585,8 @@ export default function BlastTargetDetailPage() {
                     </div>
                     <div>
                       <div className="blast-metric-label">Source Account</div>
-                      <div style={{ fontWeight: 800 }}>
-                        @{target.socialAccount?.username ?? "-"}
+                      <div>
+                        <SocialAccountUsernameLink account={target.socialAccount} />
                       </div>
                       <div className="muted-meta">
                         Admin-managed source account
@@ -699,8 +700,9 @@ export default function BlastTargetDetailPage() {
                 <div style={{ fontWeight: 850 }}>
                   New Attempt #{(attempts?.length ?? 0) + 1}
                 </div>
-                <div className="muted-meta">
-                  @{target.socialAccount?.username} • {target.postUrl}
+                <div className="muted-meta" style={{ display: 'flex', alignItems: 'center', gap: '0.35rem', flexWrap: 'wrap' }}>
+                  <SocialAccountUsernameLink account={target.socialAccount} style={{ fontWeight: 700 }} />
+                  <span>• {target.postUrl}</span>
                 </div>
               </div>
             </div>

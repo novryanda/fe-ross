@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { Archive, ChevronLeft, ChevronRight, Eye, ExternalLink, PauseCircle, RefreshCw, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PlatformBadge, StatusBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { formatDateTime } from '@/lib/utils'
 import type { BlastTarget, BlastTargetStatus, PaginationMeta } from '@/types'
 
@@ -70,7 +71,7 @@ export function BlastLinksTable({
                     <div className="source-account-cell">
                       <div className="source-avatar">{target.socialAccount?.username?.charAt(0).toUpperCase() ?? 'S'}</div>
                       <div>
-                        <div style={{ fontWeight: 800 }}>@{target.socialAccount?.username ?? '-'}</div>
+                        <SocialAccountUsernameLink account={target.socialAccount} />
                         <div className="muted-meta">{target.socialAccount?.displayName ?? 'Source Account'}</div>
                       </div>
                     </div>

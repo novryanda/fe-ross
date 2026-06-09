@@ -1,19 +1,22 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { CheckCircle2, FolderCheck, Plus, XCircle } from 'lucide-react'
+import { CheckCircle2, ExternalLink, FolderCheck, Plus, XCircle } from 'lucide-react'
 import { CampaignShell } from '@/components/features/campaign/campaign-shell'
 import { RoleGuard } from '@/components/layout/role-guard'
 import { DataFilters } from '@/components/ui/data-filters'
 import { EmptyState } from '@/components/ui/empty-state'
 import { ErrorState } from '@/components/ui/error-state'
+import { Skeleton } from '@/components/ui/skeleton'
+import { PaginationControls } from '@/components/ui/pagination-controls'
 import { Modal } from '@/components/ui/modal'
 import { Input } from '@/components/ui/input'
 import { Select } from '@/components/ui/select'
 import { PlatformBadge } from '@/components/ui/badges'
+import { SocialAccountUsernameLink } from '@/components/features/social-account/social-account-username-link'
 import { campaignsApi } from '@/lib/api/campaigns'
 import {
   postingOrdersApi,
@@ -22,7 +25,7 @@ import {
 } from '@/lib/api/posting-orders'
 import { orgUnitsApi } from '@/lib/api/org-units'
 import { mapApiErrorToToastMessage } from '@/lib/api/errors'
-import { formatDateTime } from '@/lib/utils'
+import { formatDate, formatDateTime } from '@/lib/utils'
 import type { Platform, PostingOrderStatus, PostingSubmissionStatus } from '@/types'
 import { toast } from 'sonner'
 
@@ -43,8 +46,8 @@ function WorkflowChip({
   const palette =
     type === 'order'
       ? {
-          PUBLISHED_TO_QUEUE: { label: 'Published', color: 'var(--cyan)' },
-          CLAIMED: { label: 'Claimed', color: 'var(--status-expired)' },
+          PUBLISHED_TO_QUEUE: { label: 'Assigned', color: 'var(--cyan)' },
+          CLAIMED: { label: 'Assigned', color: 'var(--cyan)' },
           COMPLETED: { label: 'Completed', color: 'var(--status-active)' },
           CANCELLED: { label: 'Cancelled', color: 'var(--status-rejected)' },
         }
@@ -83,8 +86,13 @@ export default function CampaignPostingBankPage() {
   const [platformFilter, setPlatformFilter] = useState('')
   const [orderStatusFilter, setOrderStatusFilter] = useState('')
   const [submissionStatusFilter, setSubmissionStatusFilter] = useState('')
+  const [ordersPage, setOrdersPage] = useState(1)
+  const [ordersLimit, setOrdersLimit] = useState(10)
+  const [submissionsPage, setSubmissionsPage] = useState(1)
+  const [submissionsLimit, setSubmissionsLimit] = useState(10)
   const [isCreateOpen, setIsCreateOpen] = useState(false)
   const [targetUnitId, setTargetUnitId] = useState('')
+  const [title, setTitle] = useState('')
   const [platform, setPlatform] = useState<Platform>('INSTAGRAM')
   const [contentDriveUrl, setContentDriveUrl] = useState('')
   const [scheduledAt, setScheduledAt] = useState('')
@@ -100,18 +108,25 @@ export default function CampaignPostingBankPage() {
     queryFn: () => orgUnitsApi.list({ limit: 100, status: 'ACTIVE' }),
   })
 
+  useEffect(() => {
+    setOrdersPage(1)
+    setSubmissionsPage(1)
+  }, [search, platformFilter, orderStatusFilter, submissionStatusFilter])
+
   const orderParams = useMemo<PostingOrderListParams>(() => ({
-    limit: 50,
+    page: ordersPage,
+    limit: ordersLimit,
     search: search || undefined,
     platform: (platformFilter || undefined) as Platform | undefined,
     status: (orderStatusFilter || undefined) as PostingOrderStatus | undefined,
-  }), [orderStatusFilter, platformFilter, search])
+  }), [orderStatusFilter, ordersLimit, ordersPage, platformFilter, search])
 
   const submissionParams = useMemo<PostingOrderListParams>(() => ({
-    limit: 50,
+    page: submissionsPage,
+    limit: submissionsLimit,
     platform: (platformFilter || undefined) as Platform | undefined,
     submissionStatus: (submissionStatusFilter || undefined) as PostingSubmissionStatus | undefined,
-  }), [platformFilter, submissionStatusFilter])
+  }), [platformFilter, submissionStatusFilter, submissionsLimit, submissionsPage])
 
   const ordersQuery = useQuery({
     queryKey: ['posting-orders', campaignId, orderParams],
@@ -128,6 +143,7 @@ export default function CampaignPostingBankPage() {
       toast.success('Posting order berhasil dibuat.')
       setIsCreateOpen(false)
       setTargetUnitId('')
+      setTitle('')
       setPlatform('INSTAGRAM')
       setContentDriveUrl('')
       setScheduledAt('')
@@ -159,9 +175,12 @@ export default function CampaignPostingBankPage() {
   })
 
   const orders = ordersQuery.data?.data ?? []
+  const ordersMeta = ordersQuery.data?.meta
   const submissions = submissionsQuery.data?.data ?? []
+  const submissionsMeta = submissionsQuery.data?.meta
   const canCreate =
     targetUnitId &&
+    title.trim() &&
     platform &&
     contentDriveUrl.startsWith('http') &&
     scheduledAt
@@ -183,25 +202,24 @@ export default function CampaignPostingBankPage() {
         </div>
 
         <div className="info-banner info-banner-cyan">
-          PIC mengambil order dari queue unitnya, memilih akun sosmed miliknya sendiri saat submit, lalu admin meng-approve submission untuk blast.
+          Posting order adalah tugas ke semua PIC di unit target. Setiap PIC submit hasilnya dengan akun sendiri, lalu admin meng-approve submission yang layak untuk blast.
         </div>
 
         <DataFilters
           search={search}
-          onSearchChange={setSearch}
-          placeholder="Search caption, description, or unit..."
+          onSearchChange={(value) => { setSearch(value); setOrdersPage(1) }}
+          placeholder="Search judul, caption, description, atau unit..."
           filters={[
-            { label: 'Platform', value: platformFilter, options: platformOptions, onChange: setPlatformFilter },
+            { label: 'Platform', value: platformFilter, options: platformOptions, onChange: (value) => { setPlatformFilter(value); setOrdersPage(1); setSubmissionsPage(1) } },
             {
               label: 'Order Status',
               value: orderStatusFilter,
               options: [
-                { value: 'PUBLISHED_TO_QUEUE', label: 'Published' },
-                { value: 'CLAIMED', label: 'Claimed' },
+                { value: 'PUBLISHED_TO_QUEUE', label: 'Assigned' },
                 { value: 'COMPLETED', label: 'Completed' },
                 { value: 'CANCELLED', label: 'Cancelled' },
               ],
-              onChange: setOrderStatusFilter,
+              onChange: (value) => { setOrderStatusFilter(value); setOrdersPage(1) },
             },
             {
               label: 'Submission',
@@ -211,7 +229,7 @@ export default function CampaignPostingBankPage() {
                 { value: 'APPROVED_FOR_BLAST', label: 'Approved' },
                 { value: 'REJECTED', label: 'Rejected' },
               ],
-              onChange: setSubmissionStatusFilter,
+              onChange: (value) => { setSubmissionStatusFilter(value); setSubmissionsPage(1) },
             },
           ]}
           actions={
@@ -233,21 +251,23 @@ export default function CampaignPostingBankPage() {
         )}
 
         {!ordersQuery.isError && !submissionsQuery.isError && (
-          <div className="two-col" style={{ alignItems: 'start' }}>
-            <section className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+          <div className="posting-bank-stack">
+            <section className="posting-bank-section">
+              <div className="posting-bank-section-header">
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 900 }}>Posting Orders</h3>
-                  <p className="muted-meta">Queue yang akan dibaca PIC sesuai unit target.</p>
+                  <h3 className="posting-bank-section-title">Posting Orders</h3>
+                  <p className="muted-meta">Daftar tugas posting yang harus dikerjakan semua PIC di unit target.</p>
                 </div>
-                <span className="selected-chip">{orders.length} orders</span>
+                <span className="selected-chip">{ordersMeta?.total ?? orders.length} orders</span>
               </div>
 
               {ordersQuery.isLoading ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="skeleton" style={{ height: 58, borderRadius: 12, marginBottom: '0.65rem' }} />
-                ))
-              ) : orders.length === 0 ? (
+                <div className="data-table-container" style={{ padding: '1rem' }}>
+                  <Skeleton height={46} />
+                  <Skeleton height={52} style={{ marginTop: '0.65rem' }} />
+                  <Skeleton height={52} style={{ marginTop: '0.65rem' }} />
+                </div>
+              ) : (ordersMeta?.total ?? 0) === 0 ? (
                 <EmptyState
                   icon={<FolderCheck size={44} />}
                   title="Belum ada posting order"
@@ -255,129 +275,205 @@ export default function CampaignPostingBankPage() {
                   action={<button type="button" className="btn-primary" onClick={() => setIsCreateOpen(true)}>Create Order</button>}
                 />
               ) : (
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {orders.map((order) => (
-                    <article key={order.id} className="preview-card" style={{ display: 'grid', gap: '0.6rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '0.75rem' }}>
-                        <div>
-                          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <PlatformBadge platform={order.platform} size="sm" />
-                            <WorkflowChip type="order" value={order.status} />
-                          </div>
-                          <div style={{ color: 'var(--text-primary)', fontWeight: 800, marginTop: '0.45rem' }}>
-                            {order.targetUnit?.name ?? 'Unknown Unit'}
-                          </div>
-                        </div>
-                        <a href={order.contentDriveUrl} target="_blank" rel="noreferrer" className="btn-ghost" style={{ textDecoration: 'none' }}>
-                          Open Drive
-                        </a>
-                      </div>
-                      <div className="muted-meta">Schedule: {formatDateTime(order.scheduledAt)}</div>
-                      {order.caption && <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Caption: {order.caption}</div>}
-                      {order.description && <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>Desc: {order.description}</div>}
-                      {order.claimedByUser && (
-                        <div className="muted-meta">
-                          Claimed by {order.claimedByUser.name} {order.claimedAt ? `at ${formatDateTime(order.claimedAt)}` : ''}
-                        </div>
-                      )}
-                    </article>
-                  ))}
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Platform</th>
+                        <th>Title</th>
+                        <th>Target Unit</th>
+                        <th>Schedule</th>
+                        <th>Submissions</th>
+                        <th>Status</th>
+                        <th>Content</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {orders.map((order) => (
+                        <tr key={order.id}>
+                          <td><PlatformBadge platform={order.platform} size="sm" /></td>
+                          <td>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>{order.title}</div>
+                            {order.caption && (
+                              <div className="muted-meta" style={{ marginTop: '0.2rem', maxWidth: 280 }}>
+                                {order.caption}
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ color: 'var(--text-secondary)' }}>{order.targetUnit?.name ?? 'Unknown Unit'}</td>
+                          <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>{formatDateTime(order.scheduledAt)}</td>
+                          <td style={{ fontWeight: 700 }}>{order.submissionCount ?? 0}</td>
+                          <td><WorkflowChip type="order" value={order.status} /></td>
+                          <td>
+                            <a href={order.contentDriveUrl} target="_blank" rel="noreferrer" className="ext-link">
+                              Open Drive <ExternalLink size={11} />
+                            </a>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <PaginationControls
+                    meta={ordersMeta}
+                    pageSize={ordersLimit}
+                    itemLabel="posting orders"
+                    onPageChange={setOrdersPage}
+                    onPageSizeChange={(value) => {
+                      setOrdersLimit(value)
+                      setOrdersPage(1)
+                    }}
+                  />
                 </div>
               )}
             </section>
 
-            <section className="card" style={{ padding: '1.25rem' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '1rem', marginBottom: '1rem' }}>
+            <section className="posting-bank-section">
+              <div className="posting-bank-section-header">
                 <div>
-                  <h3 style={{ fontSize: '1rem', fontWeight: 900 }}>PIC Submissions</h3>
+                  <h3 className="posting-bank-section-title">PIC Submissions</h3>
                   <p className="muted-meta">Review hasil posting sebelum dijadikan sumber blast.</p>
                 </div>
-                <span className="selected-chip">{submissions.length} submissions</span>
+                <span className="selected-chip">{submissionsMeta?.total ?? submissions.length} submissions</span>
               </div>
 
               {submissionsQuery.isLoading ? (
-                Array.from({ length: 4 }).map((_, index) => (
-                  <div key={index} className="skeleton" style={{ height: 72, borderRadius: 12, marginBottom: '0.65rem' }} />
-                ))
-              ) : submissions.length === 0 ? (
+                <div className="data-table-container" style={{ padding: '1rem' }}>
+                  <Skeleton height={46} />
+                  <Skeleton height={52} style={{ marginTop: '0.65rem' }} />
+                  <Skeleton height={52} style={{ marginTop: '0.65rem' }} />
+                </div>
+              ) : (submissionsMeta?.total ?? 0) === 0 ? (
                 <EmptyState
                   icon={<FolderCheck size={44} />}
                   title="Belum ada submission"
                   description="Submission PIC akan muncul di sini setelah mereka submit hasil posting."
                 />
               ) : (
-                <div style={{ display: 'grid', gap: '0.75rem' }}>
-                  {submissions.map((submission) => (
-                    <article key={submission.id} className="preview-card" style={{ display: 'grid', gap: '0.6rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'start', justifyContent: 'space-between', gap: '0.75rem', flexWrap: 'wrap' }}>
-                        <div>
-                          <div style={{ display: 'flex', gap: '0.45rem', flexWrap: 'wrap', alignItems: 'center' }}>
-                            <PlatformBadge platform={submission.postingOrder?.platform ?? submission.socialAccount?.platform ?? 'INSTAGRAM'} size="sm" />
-                            <WorkflowChip type="submission" value={submission.status} />
-                          </div>
-                          <div style={{ color: 'var(--text-primary)', fontWeight: 800, marginTop: '0.45rem' }}>
-                            {submission.submittedByUser?.name ?? submission.submittedById}
-                          </div>
-                          <div className="muted-meta">
-                            {submission.socialAccount ? `@${submission.socialAccount.username}` : submission.socialAccountId}
-                          </div>
-                        </div>
-                        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                          <a href={submission.postedUrl} target="_blank" rel="noreferrer" className="btn-ghost" style={{ textDecoration: 'none' }}>
-                            Posted URL
-                          </a>
-                          <a href={submission.proofDriveUrl} target="_blank" rel="noreferrer" className="btn-ghost" style={{ textDecoration: 'none' }}>
-                            Proof Drive
-                          </a>
-                        </div>
-                      </div>
+                <div className="data-table-container">
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Platform</th>
+                        <th>PIC</th>
+                        <th>Social Account</th>
+                        <th>Posted URL</th>
+                        <th>Proof</th>
+                        <th>Submitted</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {submissions.map((submission) => (
+                        <tr key={submission.id}>
+                          <td>
+                            <PlatformBadge
+                              platform={submission.postingOrder?.platform ?? submission.socialAccount?.platform ?? 'INSTAGRAM'}
+                              size="sm"
+                            />
+                          </td>
+                          <td>
+                            <div style={{ fontWeight: 800, color: 'var(--text-primary)' }}>
+                              {submission.submittedByUser?.name ?? submission.submittedById}
+                            </div>
+                            {submission.postingOrder?.title && (
+                              <div className="muted-meta" style={{ marginTop: '0.2rem' }}>
+                                {submission.postingOrder.title}
+                              </div>
+                            )}
+                          </td>
+                          <td>
+                            {submission.socialAccount
+                              ? <SocialAccountUsernameLink account={submission.socialAccount} />
+                              : submission.socialAccountId}
+                          </td>
+                          <td>
+                            <a href={submission.postedUrl} target="_blank" rel="noreferrer" className="ext-link" style={{ maxWidth: 220, display: 'inline-flex' }}>
+                              {submission.postedUrl.replace(/^https?:\/\//, '').slice(0, 42)}
+                              {(submission.postedUrl.replace(/^https?:\/\//, '').length > 42) ? '…' : ''}
+                              <ExternalLink size={11} />
+                            </a>
+                          </td>
+                          <td>
+                            <a href={submission.proofDriveUrl} target="_blank" rel="noreferrer" className="ext-link">
+                              Proof <ExternalLink size={11} />
+                            </a>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)', whiteSpace: 'nowrap' }}>
+                            {formatDate(submission.submittedAt)}
+                          </td>
+                          <td><WorkflowChip type="submission" value={submission.status} /></td>
+                          <td>
+                            <div className="action-row" style={{ justifyContent: 'flex-start', flexWrap: 'wrap' }}>
+                              {submission.status === 'SUBMITTED' && (
+                                <>
+                                  <button
+                                    type="button"
+                                    className="icon-action"
+                                    onClick={() => reviewMutation.mutate({ submissionId: submission.id, status: 'APPROVED_FOR_BLAST' })}
+                                    disabled={reviewMutation.isPending}
+                                  >
+                                    <CheckCircle2 size={13} /> Approve
+                                  </button>
+                                  <button
+                                    type="button"
+                                    className="icon-action danger"
+                                    onClick={() => reviewMutation.mutate({ submissionId: submission.id, status: 'REJECTED' })}
+                                    disabled={reviewMutation.isPending}
+                                  >
+                                    <XCircle size={13} /> Reject
+                                  </button>
+                                </>
+                              )}
 
-                      <div className="muted-meta">
-                        Submitted at {formatDateTime(submission.submittedAt)}
-                      </div>
-                      {submission.notes && <div style={{ color: 'var(--text-secondary)', fontSize: '0.82rem' }}>{submission.notes}</div>}
+                              {submission.status === 'APPROVED_FOR_BLAST' && !submission.blastTargetId && (
+                                <button
+                                  type="button"
+                                  className="icon-action"
+                                  onClick={() => blastMutation.mutate(submission.id)}
+                                  disabled={blastMutation.isPending}
+                                >
+                                  Create Blast
+                                </button>
+                              )}
 
-                      <div style={{ display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
-                        {submission.status === 'SUBMITTED' && (
-                          <>
-                            <button
-                              type="button"
-                              className="btn-primary"
-                              onClick={() => reviewMutation.mutate({ submissionId: submission.id, status: 'APPROVED_FOR_BLAST' })}
-                              disabled={reviewMutation.isPending}
-                            >
-                              <CheckCircle2 size={14} /> Approve
-                            </button>
-                            <button
-                              type="button"
-                              className="btn-danger"
-                              onClick={() => reviewMutation.mutate({ submissionId: submission.id, status: 'REJECTED' })}
-                              disabled={reviewMutation.isPending}
-                            >
-                              <XCircle size={14} /> Reject
-                            </button>
-                          </>
-                        )}
+                              {submission.status === 'APPROVED_FOR_BLAST' && !submission.commentCommandId && (
+                                <Link
+                                  href={`/campaigns/${campaignId}/commands/from-pic?submissionId=${submission.id}`}
+                                  className="icon-action"
+                                  style={{ textDecoration: 'none' }}
+                                >
+                                  Create Comment
+                                </Link>
+                              )}
 
-                        {submission.status === 'APPROVED_FOR_BLAST' && !submission.blastTargetId && (
-                          <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => blastMutation.mutate(submission.id)}
-                            disabled={blastMutation.isPending}
-                          >
-                            Create Blast Target
-                          </button>
-                        )}
+                              {submission.blastTargetId && (
+                                <Link href={`/campaigns/${campaignId}/blast-links/${submission.blastTargetId}`} className="icon-action" style={{ textDecoration: 'none' }}>
+                                  Open Blast
+                                </Link>
+                              )}
 
-                        {submission.blastTargetId && (
-                          <Link href={`/campaigns/${campaignId}/blast-links/${submission.blastTargetId}`} className="btn-ghost" style={{ textDecoration: 'none' }}>
-                            Open Blast Target
-                          </Link>
-                        )}
-                      </div>
-                    </article>
-                  ))}
+                              {submission.commentCommandId && (
+                                <Link href={`/campaigns/${campaignId}/commands/${submission.commentCommandId}`} className="icon-action" style={{ textDecoration: 'none' }}>
+                                  Open Command
+                                </Link>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  <PaginationControls
+                    meta={submissionsMeta}
+                    pageSize={submissionsLimit}
+                    itemLabel="submissions"
+                    onPageChange={setSubmissionsPage}
+                    onPageSizeChange={(value) => {
+                      setSubmissionsLimit(value)
+                      setSubmissionsPage(1)
+                    }}
+                  />
                 </div>
               )}
             </section>
@@ -390,6 +486,12 @@ export default function CampaignPostingBankPage() {
           title="Create Posting Order"
         >
           <div style={{ display: 'grid', gap: '1rem' }}>
+            <Input
+              label="Judul Bank Konten"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              placeholder="Contoh: Video Literasi Digital TikTok"
+            />
             <Select
               label="Target PIC Unit"
               value={targetUnitId}
@@ -448,6 +550,7 @@ export default function CampaignPostingBankPage() {
                 onClick={() =>
                   createMutation.mutate({
                     targetUnitId,
+                    title: title.trim(),
                     platform,
                     contentDriveUrl,
                     scheduledAt: new Date(scheduledAt).toISOString(),

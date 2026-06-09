@@ -2,7 +2,7 @@
 import Link from 'next/link'
 import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertCircle, ArrowLeft, Info } from 'lucide-react'
+import { AlertCircle, ArrowLeft } from 'lucide-react'
 import { StatusBadge } from '@/components/ui/badges'
 import { EnterpriseCampaignEditForm, type EnterpriseCampaignEditPayload } from '@/components/features/campaign/enterprise-campaign-edit-form'
 import type { MockMember } from '@/components/features/campaign/enterprise-campaign-form'
@@ -20,19 +20,18 @@ function toSelectableMembers(
   const rows = new Map<string, MockMember>()
 
   for (const user of users?.items ?? []) {
-    if (user.role === 'PIC') continue
-    rows.set(user.id, { id: user.id, name: user.name, role: user.role })
+    rows.set(user.id, { id: user.id, name: user.name, role: user.role as MockMember['role'] })
   }
 
   for (const member of members) {
-    const role = member.roleInCampaign === 'ADMIN' || member.roleInCampaign === 'BUZZER' || member.roleInCampaign === 'VIEWER'
+    const role = member.roleInCampaign === 'ADMIN' || member.roleInCampaign === 'BUZZER' || member.roleInCampaign === 'PIC' || member.roleInCampaign === 'VIEWER'
       ? member.roleInCampaign
       : member.user?.role
-    if (member.userId && role && role !== 'PIC') {
+    if (member.userId && role) {
       rows.set(member.userId, {
         id: member.userId,
         name: member.user?.name ?? member.userId,
-        role,
+        role: role as MockMember['role'],
       })
     }
   }
@@ -47,7 +46,6 @@ function buildInitialCampaign(
   return {
     name: campaign.name,
     description: campaign.description,
-    objective: campaign.description ?? '',
     startDate: campaign.startDate.slice(0, 10),
     endDate: campaign.endDate?.slice(0, 10) ?? '',
     platforms: campaign.platforms,
@@ -55,14 +53,14 @@ function buildInitialCampaign(
     members: {
       adminIds: members.filter(member => member.roleInCampaign === 'ADMIN').map(member => member.userId),
       buzzerIds: members.filter(member => member.roleInCampaign === 'BUZZER').map(member => member.userId),
+      picIds: members.filter(member => member.roleInCampaign === 'PIC').map(member => member.userId),
       viewerIds: members.filter(member => member.roleInCampaign === 'VIEWER').map(member => member.userId),
     },
-    internalNotes: '',
   }
 }
 
 function flattenMemberIds(data: EnterpriseCampaignEditPayload['members']) {
-  return new Set([...data.adminIds, ...data.buzzerIds, ...data.viewerIds])
+  return new Set([...data.adminIds, ...data.buzzerIds, ...data.picIds, ...data.viewerIds])
 }
 
 export default function EditCampaignPage() {
@@ -179,10 +177,6 @@ export default function EditCampaignPage() {
             <StatusBadge status={campaign.status} type="campaign" size="sm" />
           </div>
           <p className="section-subtitle">Update campaign information, period, status, and campaign members.</p>
-          <div className="blast-info-banner" style={{ marginTop: '1rem', marginBottom: 0 }}>
-            <Info size={18} style={{ color: 'var(--cyan)', flexShrink: 0 }} />
-            <span>Objective dan internal notes tetap UI-only dan tidak dikirim ke backend campaign endpoint.</span>
-          </div>
         </div>
       </div>
 
